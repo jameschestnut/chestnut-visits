@@ -17,6 +17,7 @@ export default function NewTechnicianPage() {
     initials: '',
     email: '',
     home_postcode: '',
+    start_date: '',
     notes: '',
   })
 
@@ -24,16 +25,16 @@ export default function NewTechnicianPage() {
     const { name, value } = e.target
     setForm(prev => {
       const updated = { ...prev, [name]: value }
-      // Auto-generate initials from full name if initials field is empty
+      // Auto-generate initials from full name
       if (name === 'full_name') {
-  updated.initials = value
-    .split(' ')
-    .filter(n => n.length > 0)
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 3)
-} 
+        updated.initials = value
+          .split(' ')
+          .filter(n => n.length > 0)
+          .map(n => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 3)
+      }
       return updated
     })
   }
@@ -46,12 +47,13 @@ export default function NewTechnicianPage() {
     const { error } = await supabase
       .from('technicians')
       .insert({
-        full_name: form.full_name.trim(),
-        initials: form.initials.trim().toUpperCase() || null,
-        email: form.email.trim(),
+        full_name:     form.full_name.trim(),
+        initials:      form.initials.trim().toUpperCase() || null,
+        email:         form.email.trim(),
         home_postcode: form.home_postcode.trim().toUpperCase() || null,
-        notes: form.notes.trim() || null,
-        is_active: true,
+        start_date:    form.start_date || null,
+        notes:         form.notes.trim() || null,
+        is_active:     true,
       })
 
     if (error) {
@@ -67,7 +69,6 @@ export default function NewTechnicianPage() {
   return (
     <div className="max-w-lg">
 
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Link href="/admin/technicians" className="text-gray-400 hover:text-gray-600 text-sm">
           ← Technicians
@@ -142,10 +143,23 @@ export default function NewTechnicianPage() {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start date
+            </label>
+            <input
+              name="start_date"
+              type="date"
+              value={form.start_date}
+              onChange={handleChange}
+              className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+          </div>
+
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Notes</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Notes</h2>
           <textarea
             name="notes"
             value={form.notes}
