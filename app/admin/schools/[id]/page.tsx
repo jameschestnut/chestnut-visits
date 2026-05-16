@@ -11,27 +11,19 @@ export default async function SchoolProfilePage({
   const supabase = await createServiceSupabaseClient()
 
   // Fetch school with contacts and contracts
-  const { data: school } = await supabase
+  const { data: school, error } = await supabase
     .from('schools')
     .select(`
       *,
       school_contacts (*),
-      contracts (
-        *,
-        contract_assignments (
-          *,
-          technicians (
-            id,
-            full_name,
-            initials
-          )
-        )
-      )
+      contracts (*)
     `)
     .eq('id', id)
     .single()
 
-  if (!school) notFound()
+console.log('School error:', error)
+
+if (!school) notFound()
 
   const activeContract = school.contracts?.find(
     (c: { status: string }) => c.status === 'active'
@@ -149,46 +141,6 @@ export default async function SchoolProfilePage({
                   </div>
                 </div>
 
-                {/* Assignment lines */}
-                {activeContract.contract_assignments?.length > 0 && (
-                  <div className="border-t border-gray-50 pt-4">
-                    <p className="text-xs text-gray-400 mb-3">Assignment lines</p>
-                    <div className="space-y-2">
-                      {activeContract.contract_assignments.map((a: {
-                        id: string
-                        technicians: { full_name: string; initials: string }
-                        frequency: string
-                        preferred_day: number | null
-                        preferred_slot: string | null
-                      }) => {
-                        const dayNames: Record<number, string> = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri' }
-                        return (
-                          <div key={a.id} className="flex items-center gap-3 text-sm">
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-                              style={{ background: '#8B3A2A' }}>
-                              {a.technicians?.initials}
-                            </div>
-                            <span className="text-gray-900 font-medium">{a.technicians?.full_name}</span>
-                            <span className="text-gray-400">·</span>
-                            <span className="text-gray-600 capitalize">{a.frequency.replace('_', ' ')}</span>
-                            {a.preferred_day && (
-                              <>
-                                <span className="text-gray-400">·</span>
-                                <span className="text-gray-600">{dayNames[a.preferred_day]}</span>
-                              </>
-                            )}
-                            {a.preferred_slot && (
-                              <>
-                                <span className="text-gray-400">·</span>
-                                <span className="text-gray-600 uppercase">{a.preferred_slot}</span>
-                              </>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="text-center py-6">
