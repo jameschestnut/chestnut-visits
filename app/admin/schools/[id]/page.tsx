@@ -229,12 +229,20 @@ export default async function SchoolProfilePage({
                   is_primary: boolean
                 }) => (
                   <div key={contact.id} className="text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{contact.full_name}</span>
-                      {contact.is_primary && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Primary</span>
-                      )}
-                    </div>
+<div className="flex items-center justify-between gap-2">
+  <div className="flex items-center gap-2">
+    <span className="font-medium text-gray-900">{contact.full_name}</span>
+    {contact.is_primary && (
+      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Primary</span>
+    )}
+  </div>
+  <Link
+    href={`/admin/schools/${id}/contacts/${contact.id}/edit`}
+    className="text-xs text-gray-400 hover:text-gray-700 shrink-0"
+  >
+    Edit
+  </Link>
+</div>
                     {contact.role_title && (
                       <p className="text-gray-400 text-xs mt-0.5">{contact.role_title}</p>
                     )}
