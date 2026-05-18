@@ -53,10 +53,18 @@ export default async function TechniciansPage() {
                   className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-                        style={{ background: tech.is_active ? '#8B3A2A' : '#94a3b8' }}>
-                        {tech.initials || tech.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                      </div>
+                      {tech.photo_url ? (
+  <img
+    src={tech.photo_url}
+    alt={tech.full_name}
+    className="w-8 h-8 rounded-full object-cover border border-gray-100 shrink-0"
+  />
+) : (
+  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+    style={{ background: tech.is_active ? '#8B3A2A' : '#94a3b8' }}>
+    {tech.initials || tech.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+  </div>
+)}
                       <span className="font-medium text-gray-900">{tech.full_name}</span>
                     </div>
                   </td>

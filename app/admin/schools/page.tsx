@@ -70,11 +70,27 @@ export default async function SchoolsPage() {
                     className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{school.name}</div>
-                      {school.short_name && (
-                        <div className="text-xs text-gray-400">{school.short_name}</div>
-                      )}
-                    </td>
+  <div className="flex items-center gap-3">
+    {school.photo_url ? (
+      <img
+        src={school.photo_url}
+        alt={school.name}
+        className="w-8 h-8 rounded-lg object-cover border border-gray-100 shrink-0"
+      />
+    ) : (
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-semibold shrink-0"
+        style={{ background: '#8B3A2A' }}>
+        {(school.short_name || school.name).slice(0, 2).toUpperCase()}
+      </div>
+    )}
+    <div>
+      <div className="font-medium text-gray-900">{school.name}</div>
+      {school.short_name && (
+        <div className="text-xs text-gray-400">{school.short_name}</div>
+      )}
+    </div>
+  </div>
+</td>
                     <td className="px-4 py-3 text-gray-600">{school.town ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600 font-mono text-xs">{school.postcode ?? '—'}</td>
                     <td className="px-4 py-3">

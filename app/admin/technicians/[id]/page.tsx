@@ -65,10 +65,18 @@ export default async function TechnicianProfilePage({
     </Link>
     <span className="text-gray-200">/</span>
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-        style={{ background: tech.is_active ? '#8B3A2A' : '#94a3b8' }}>
-        {tech.initials}
-      </div>
+      {tech.photo_url ? (
+  <img
+    src={tech.photo_url}
+    alt={tech.full_name}
+    className="w-9 h-9 rounded-full object-cover border border-gray-100"
+  />
+) : (
+  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+    style={{ background: tech.is_active ? '#8B3A2A' : '#94a3b8' }}>
+    {tech.initials}
+  </div>
+)}
       <h1 className="text-xl font-semibold text-gray-900">{tech.full_name}</h1>
     </div>
     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -106,24 +114,8 @@ export default async function TechnicianProfilePage({
             <div>
               <dt className="text-gray-400">Home postcode</dt>
               <dd className="text-gray-900 font-mono mt-0.5">{tech.home_postcode ?? '—'}</dd>
-            </div>
-       
-            <div>
-              <dt className="text-gray-400">Start date</dt>
-              <dd className="text-gray-900 mt-0.5">
-                {tech.start_date
-                  ? new Date(tech.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-                  : '—'}
-              </dd>
-            </div>
-            {tech.leaving_date && (
-              <div>
-                <dt className="text-gray-400">Leaving date</dt>
-                <dd className="text-orange-600 font-medium mt-0.5">
-                  {new Date(tech.leaving_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </dd>
-              </div>
-            )}
+            </div>  
+           
           </dl>
           {tech.notes && (
             <div className="mt-4 pt-4 border-t border-gray-50">
@@ -175,25 +167,46 @@ export default async function TechnicianProfilePage({
   )}
 </div>
 
-        {/* Leaver / status actions */}
-        {!isLeaver ? (
-          <div className="bg-white rounded-xl border border-gray-100 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-1">Employment status</h2>
-            <p className="text-xs text-gray-400 mb-4">
-              Marking as a leaver will bank all future confirmed visits from the leaving date onwards.
-            </p>
-            <MarkAsLeaverButton techId={id} techName={tech.full_name} />
-          </div>
-        ) : (
-          <div className="bg-orange-50 border border-orange-100 rounded-xl p-5">
-            <p className="text-sm font-medium text-orange-800">
-              This technician is leaving on {new Date(tech.leaving_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.
-            </p>
-            <p className="text-xs text-orange-600 mt-1">
-              All confirmed visits from that date have been banked for reassignment.
-            </p>
-          </div>
-        )}
+{/* Employment */}
+<div className="bg-white rounded-xl border border-gray-100 p-5">
+  <h2 className="text-sm font-semibold text-gray-700 mb-4">Employment</h2>
+  <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm mb-4">
+    <div>
+      <dt className="text-gray-400">Start date</dt>
+      <dd className="text-gray-900 mt-0.5">
+        {tech.start_date
+          ? new Date(tech.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+          : '—'}
+      </dd>
+    </div>
+    {tech.leaving_date && (
+      <div>
+        <dt className="text-gray-400">Leaving date</dt>
+        <dd className="text-orange-600 font-medium mt-0.5">
+          {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </dd>
+      </div>
+    )}
+  </dl>
+
+  {isLeaver ? (
+    <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
+      <p className="text-sm font-medium text-orange-800">
+        Leaving on {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+      </p>
+      <p className="text-xs text-orange-600 mt-1">
+        All confirmed visits from that date have been banked for reassignment.
+      </p>
+    </div>
+  ) : (
+    <div>
+      <p className="text-xs text-gray-400 mb-3">
+        Marking as a leaver will bank all future confirmed visits from the leaving date onwards.
+      </p>
+      <MarkAsLeaverButton techId={id} techName={tech.full_name} />
+    </div>
+  )}
+</div>
 
         {/* Absence log */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">

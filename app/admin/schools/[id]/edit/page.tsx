@@ -4,27 +4,31 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+import PhotoUpload from '@/components/PhotoUpload'
 
 export default function EditSchoolPage() {
-  const router = useRouter()
-  const params = useParams()
+  const router   = useRouter()
+  const params   = useParams()
   const schoolId = params.id as string
   const supabase = createClient()
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [deleting, setDeleting]     = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
+  const [error, setError]           = useState<string | null>(null)
 
   const [form, setForm] = useState({
-    name:          '',
-    short_name:    '',
+    name:           '',
+    short_name:     '',
     address_line_1: '',
     address_line_2: '',
-    town:          '',
-    county:        '',
-    postcode:      '',
-    notes:         '',
-    is_active:     true,
+    town:           '',
+    county:         '',
+    postcode:       '',
+    notes:          '',
+    is_active:      true,
+    photo_url:      '',
   })
 
   useEffect(() => {
@@ -46,6 +50,7 @@ export default function EditSchoolPage() {
           postcode:       data.postcode ?? '',
           notes:          data.notes ?? '',
           is_active:      data.is_active ?? true,
+          photo_url:      data.photo_url ?? '',
         })
       }
       setLoading(false)
@@ -91,6 +96,12 @@ export default function EditSchoolPage() {
     router.refresh()
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from('schools').delete().eq('id', schoolId)
+    router.push('/admin/schools')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -112,6 +123,19 @@ export default function EditSchoolPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
+        {/* Photo */}
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Photo</h2>
+          <PhotoUpload
+            currentUrl={form.photo_url || null}
+            entityType="school"
+            entityId={schoolId}
+            displayName={form.name}
+            onUpload={url => setForm(p => ({ ...p, photo_url: url }))}
+          />
+        </div>
+
+        {/* School details */}
         <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700">School details</h2>
 
@@ -141,6 +165,7 @@ export default function EditSchoolPage() {
           </label>
         </div>
 
+        {/* Address */}
         <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700">Address</h2>
 
@@ -181,6 +206,7 @@ export default function EditSchoolPage() {
           </div>
         </div>
 
+        {/* Notes */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Notes</h2>
           <textarea name="notes" value={form.notes} onChange={handleChange} rows={3}
@@ -191,19 +217,50 @@ export default function EditSchoolPage() {
           <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">{error}</p>
         )}
 
-        <div className="flex items-center gap-3">
-          <button type="submit" disabled={saving || !form.name}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
-            style={{ background: '#8B3A2A' }}>
-            {saving ? 'Saving…' : 'Save changes'}
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button type="submit" disabled={saving || !form.name}
+              className="px-6 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: '#8B3A2A' }}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <Link href={`/admin/schools/${schoolId}`}
+              className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+              Cancel
+            </Link>
+          </div>
+          <button type="button" onClick={() => setShowDelete(true)}
+            className="text-sm text-red-500 hover:text-red-700">
+            Delete school
           </button>
-          <Link href={`/admin/schools/${schoolId}`}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
-            Cancel
-          </Link>
         </div>
 
       </form>
+
+      {/* Delete confirmation modal */}
+      {showDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowDelete(false)}>
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Delete school?</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              This will permanently remove <strong>{form.name}</strong> and all associated data. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button onClick={() => setShowDelete(false)}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

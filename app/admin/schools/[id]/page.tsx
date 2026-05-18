@@ -46,7 +46,21 @@ export default async function SchoolProfilePage({
             ← Schools
           </Link>
           <span className="text-gray-200">/</span>
-          <h1 className="text-xl font-semibold text-gray-900">{school.name}</h1>
+<div className="flex items-center gap-3">
+  {school.photo_url ? (
+    <img
+      src={school.photo_url}
+      alt={school.name}
+      className="w-9 h-9 rounded-lg object-cover border border-gray-100"
+    />
+  ) : (
+    <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
+      style={{ background: '#8B3A2A' }}>
+      {(school.short_name || school.name).slice(0, 2).toUpperCase()}
+    </div>
+  )}
+  <h1 className="text-xl font-semibold text-gray-900">{school.name}</h1>
+</div>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
             school.is_active
               ? 'bg-green-50 text-green-700'
