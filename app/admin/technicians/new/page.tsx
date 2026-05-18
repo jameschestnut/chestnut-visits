@@ -18,6 +18,10 @@ export default function NewTechnicianPage() {
     email: '',
     home_postcode: '',
     start_date: '',
+    dbs_number: '',
+    dbs_type: '',
+    dbs_issue_date: '',
+    dbs_expiry_date: '',
     notes: '',
   })
 
@@ -52,6 +56,10 @@ export default function NewTechnicianPage() {
         email:         form.email.trim(),
         home_postcode: form.home_postcode.trim().toUpperCase() || null,
         start_date:    form.start_date || null,
+        dbs_number:      form.dbs_number.trim() || null,
+        dbs_type:        form.dbs_type || null,
+        dbs_issue_date:  form.dbs_issue_date || null,
+        dbs_expiry_date: form.dbs_expiry_date || null,
         notes:         form.notes.trim() || null,
         is_active:     true,
       })
@@ -157,6 +165,69 @@ export default function NewTechnicianPage() {
           </div>
 
         </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+  <h2 className="text-sm font-semibold text-gray-700">DBS information</h2>
+
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">DBS number</label>
+    <input
+      name="dbs_number"
+      type="text"
+      value={form.dbs_number}
+      onChange={handleChange}
+      placeholder="e.g. 001234567890"
+      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+    />
+  </div>
+
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">Certificate type</label>
+    <div className="flex gap-2">
+      {['basic', 'standard', 'enhanced'].map(type => (
+        <label key={type}
+          className={`flex-1 flex items-center justify-center px-3 py-2 rounded-lg border cursor-pointer transition-colors capitalize text-sm ${
+            form.dbs_type === type
+              ? 'border-gray-900 bg-gray-900 text-white'
+              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+          }`}>
+          <input
+            type="radio"
+            name="dbs_type"
+            value={type}
+            checked={form.dbs_type === type}
+            onChange={handleChange}
+            className="sr-only"
+          />
+          {type}
+        </label>
+      ))}
+    </div>
+  </div>
+
+  <div className="grid grid-cols-2 gap-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Issue date</label>
+      <input
+        name="dbs_issue_date"
+        type="date"
+        value={form.dbs_issue_date}
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Expiry date</label>
+      <input
+        name="dbs_expiry_date"
+        type="date"
+        value={form.dbs_expiry_date}
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+      />
+    </div>
+  </div>
+</div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Notes</h2>

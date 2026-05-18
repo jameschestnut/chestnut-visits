@@ -10,28 +10,31 @@ export default async function SchoolProfilePage({
   const { id } = await params
   const supabase = await createServiceSupabaseClient()
 
-  // Fetch school with contacts and contracts
-  const { data: school, error } = await supabase
+  const { data: school } = await supabase
     .from('schools')
     .select(`
       *,
       school_contacts (*),
-      contracts (*)
+      contracts (
+        *,
+        visits (id, status)
+      )
     `)
     .eq('id', id)
     .single()
 
-console.log('School error:', error)
-
-if (!school) notFound()
+  if (!school) notFound()
 
   const activeContract = school.contracts?.find(
     (c: { status: string }) => c.status === 'active'
   )
 
-  const primaryContact = school.school_contacts?.find(
-    (c: { is_primary: boolean }) => c.is_primary
-  )
+  // Visit stats from active contract
+  const activeVisits   = activeContract?.visits ?? []
+  const completedCount = activeVisits.filter((v: { status: string }) => v.status === 'completed').length
+  const bankedCount    = activeVisits.filter((v: { status: string }) => v.status === 'banked').length
+  const totalCount     = activeVisits.length
+  const remainingCount = totalCount - completedCount - bankedCount
 
   return (
     <div className="max-w-4xl">
@@ -106,45 +109,87 @@ if (!school) notFound()
             )}
           </div>
 
-          {/* Active contract */}
+          {/* Contracts */}
           <div className="bg-white rounded-xl border border-gray-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-700">Contract</h2>
-              <Link
-                href={`/admin/schools/${id}/contracts/new`}
-                className="text-xs text-gray-400 hover:text-gray-700"
-              >
-                + Add contract
-              </Link>
+              <h2 className="text-sm font-semibold text-gray-700">Contracts</h2>
+              <div className="flex items-center gap-3">
+                {activeContract && (
+                  <Link
+                    href={`/admin/schools/${id}/schedule/generate`}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
+                    style={{ background: '#8B3A2A' }}
+                  >
+                    Generate schedule
+                  </Link>
+                )}
+                <Link
+                  href={`/admin/schools/${id}/contracts/new`}
+                  className="text-xs text-gray-400 hover:text-gray-700"
+                >
+                  + Add contract
+                </Link>
+              </div>
             </div>
 
-            {activeContract ? (
-              <div>
-                <div className="grid grid-cols-3 gap-4 text-sm mb-4">
-                  <div>
-                    <dt className="text-gray-400 text-xs">Academic year</dt>
-                    <dd className="text-gray-900 font-medium mt-0.5">{activeContract.academic_year}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-gray-400 text-xs">Visit duration</dt>
-                    <dd className="text-gray-900 font-medium mt-0.5 capitalize">
-                      {activeContract.visit_duration === 'half_day' ? 'Half day (3.5hr)' : 'Full day (7hr)'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-gray-400 text-xs">Period</dt>
-                    <dd className="text-gray-900 font-medium mt-0.5">
-                      {new Date(activeContract.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      {' – '}
-                      {new Date(activeContract.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </dd>
-                  </div>
-                </div>
+            {school.contracts && school.contracts.length > 0 ? (
+              <div className="space-y-3">
+                {school.contracts
+                  .sort((a: { start_date: string }, b: { start_date: string }) =>
+                    new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+                  )
+                  .map((contract: {
+                    id: string
+                    start_date: string
+                    end_date: string
+                    frequency: string
+                    visit_duration: string
+                    status: string
+                    visits: { id: string; status: string }[]
+                  }) => {
+                    const cCompleted = contract.visits?.filter(v => v.status === 'completed').length ?? 0
+                    const cTotal     = contract.visits?.length ?? 0
+                    const isActive   = contract.status === 'active'
 
+                    return (
+                      <div key={contract.id}
+                        className={`p-3 rounded-lg border text-sm ${
+                          isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-75'
+                        }`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-medium text-gray-900">
+                            {new Date(contract.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {' – '}
+                            {new Date(contract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            isActive
+                              ? 'bg-green-50 text-green-700'
+                              : contract.status === 'expired'
+                              ? 'bg-gray-100 text-gray-500'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {contract.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <span className="capitalize">{contract.frequency.replace('_', ' ')}</span>
+                          <span>·</span>
+                          <span>{contract.visit_duration === 'half_day' ? 'Half day' : 'Full day'}</span>
+                          {cTotal > 0 && (
+                            <>
+                              <span>·</span>
+                              <span>{cCompleted}/{cTotal} visits completed</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
               </div>
             ) : (
               <div className="text-center py-6">
-                <p className="text-sm text-gray-400 mb-3">No active contract</p>
+                <p className="text-sm text-gray-400 mb-3">No contracts yet</p>
                 <Link
                   href={`/admin/schools/${id}/contracts/new`}
                   className="inline-flex px-4 py-2 rounded-lg text-sm font-medium text-white"
@@ -180,7 +225,6 @@ if (!school) notFound()
                   full_name: string
                   role_title: string | null
                   email: string
-                  phone: string | null
                   notify_visits: boolean
                   is_primary: boolean
                 }) => (
@@ -195,9 +239,6 @@ if (!school) notFound()
                       <p className="text-gray-400 text-xs mt-0.5">{contact.role_title}</p>
                     )}
                     <p className="text-gray-500 mt-0.5">{contact.email}</p>
-                    {contact.phone && (
-                      <p className="text-gray-500">{contact.phone}</p>
-                    )}
                     <div className="flex items-center gap-1 mt-1">
                       <div className={`w-1.5 h-1.5 rounded-full ${contact.notify_visits ? 'bg-green-500' : 'bg-gray-300'}`} />
                       <span className="text-xs text-gray-400">
@@ -214,22 +255,33 @@ if (!school) notFound()
 
           {/* Visit stats */}
           <div className="bg-white rounded-xl border border-gray-100 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">This year</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Visits completed</span>
-                <span className="font-semibold text-gray-900">—</span>
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">
+              {activeContract ? 'This contract' : 'Visits'}
+            </h2>
+            {activeContract && totalCount > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Completed</span>
+                  <span className="font-semibold text-gray-900">{completedCount}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Remaining</span>
+                  <span className="font-semibold text-gray-900">{remainingCount}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Banked</span>
+                  <span className="font-semibold text-gray-900">{bankedCount}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm border-t border-gray-50 pt-3">
+                  <span className="text-gray-500">Total scheduled</span>
+                  <span className="font-semibold text-gray-900">{totalCount}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Visits remaining</span>
-                <span className="font-semibold text-gray-900">—</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Banked visits</span>
-                <span className="font-semibold text-gray-900">—</span>
-              </div>
-            </div>
-            <p className="text-xs text-gray-300 mt-3">Available once visits are scheduled</p>
+            ) : (
+              <p className="text-xs text-gray-400">
+                {activeContract ? 'No visits scheduled yet' : 'No active contract'}
+              </p>
+            )}
           </div>
 
         </div>

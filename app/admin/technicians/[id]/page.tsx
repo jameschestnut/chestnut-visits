@@ -57,31 +57,37 @@ export default async function TechnicianProfilePage({
   return (
     <div className="max-w-3xl">
 
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/admin/technicians" className="text-gray-400 hover:text-gray-600 text-sm">
-            ← Technicians
-          </Link>
-          <span className="text-gray-200">/</span>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-              style={{ background: tech.is_active ? '#8B3A2A' : '#94a3b8' }}>
-              {tech.initials}
-            </div>
-            <h1 className="text-xl font-semibold text-gray-900">{tech.full_name}</h1>
-          </div>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            isLeaver
-              ? 'bg-orange-50 text-orange-700'
-              : tech.is_active
-              ? 'bg-green-50 text-green-700'
-              : 'bg-gray-100 text-gray-500'
-          }`}>
-            {isLeaver ? 'Leaver' : tech.is_active ? 'Active' : 'Inactive'}
-          </span>
-        </div>
+{/* Header */}
+<div className="flex items-start justify-between mb-6">
+  <div className="flex items-center gap-3">
+    <Link href="/admin/technicians" className="text-gray-400 hover:text-gray-600 text-sm">
+      ← Technicians
+    </Link>
+    <span className="text-gray-200">/</span>
+    <div className="flex items-center gap-3">
+      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+        style={{ background: tech.is_active ? '#8B3A2A' : '#94a3b8' }}>
+        {tech.initials}
       </div>
+      <h1 className="text-xl font-semibold text-gray-900">{tech.full_name}</h1>
+    </div>
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+      isLeaver
+        ? 'bg-orange-50 text-orange-700'
+        : tech.is_active
+        ? 'bg-green-50 text-green-700'
+        : 'bg-gray-100 text-gray-500'
+    }`}>
+      {isLeaver ? 'Leaver' : tech.is_active ? 'Active' : 'Inactive'}
+    </span>
+  </div>
+  <Link
+    href={`/admin/technicians/${id}/edit`}
+    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50"
+  >
+    Edit
+  </Link>
+</div>
 
       <div className="space-y-4">
 
@@ -101,6 +107,41 @@ export default async function TechnicianProfilePage({
               <dt className="text-gray-400">Home postcode</dt>
               <dd className="text-gray-900 font-mono mt-0.5">{tech.home_postcode ?? '—'}</dd>
             </div>
+       {tech.dbs_number && (
+              <div>
+                <dt className="text-gray-400">DBS number</dt>
+                <dd className="text-gray-900 font-mono mt-0.5">{tech.dbs_number}</dd>
+              </div>
+            )}
+            {tech.dbs_type && (
+              <div>
+                <dt className="text-gray-400">DBS type</dt>
+                <dd className="text-gray-900 mt-0.5 capitalize">{tech.dbs_type}</dd>
+              </div>
+            )}
+            {tech.dbs_issue_date && (
+              <div>
+                <dt className="text-gray-400">DBS issued</dt>
+                <dd className="text-gray-900 mt-0.5">
+                  {new Date(tech.dbs_issue_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </dd>
+              </div>
+            )}
+            {tech.dbs_expiry_date && (
+              <div>
+                <dt className="text-gray-400">DBS expiry</dt>
+                <dd className={`mt-0.5 font-medium ${
+                  new Date(tech.dbs_expiry_date) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+                    ? 'text-amber-600'
+                    : 'text-gray-900'
+                }`}>
+                  {new Date(tech.dbs_expiry_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {new Date(tech.dbs_expiry_date) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) && (
+                    <span className="ml-2 text-xs font-normal">⚠ expiring soon</span>
+                  )}
+                </dd>
+              </div>
+            )}  
             <div>
               <dt className="text-gray-400">Start date</dt>
               <dd className="text-gray-900 mt-0.5">
