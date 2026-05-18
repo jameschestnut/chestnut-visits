@@ -107,41 +107,7 @@ export default async function TechnicianProfilePage({
               <dt className="text-gray-400">Home postcode</dt>
               <dd className="text-gray-900 font-mono mt-0.5">{tech.home_postcode ?? '—'}</dd>
             </div>
-       {tech.dbs_number && (
-              <div>
-                <dt className="text-gray-400">DBS number</dt>
-                <dd className="text-gray-900 font-mono mt-0.5">{tech.dbs_number}</dd>
-              </div>
-            )}
-            {tech.dbs_type && (
-              <div>
-                <dt className="text-gray-400">DBS type</dt>
-                <dd className="text-gray-900 mt-0.5 capitalize">{tech.dbs_type}</dd>
-              </div>
-            )}
-            {tech.dbs_issue_date && (
-              <div>
-                <dt className="text-gray-400">DBS issued</dt>
-                <dd className="text-gray-900 mt-0.5">
-                  {new Date(tech.dbs_issue_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </dd>
-              </div>
-            )}
-            {tech.dbs_expiry_date && (
-              <div>
-                <dt className="text-gray-400">DBS expiry</dt>
-                <dd className={`mt-0.5 font-medium ${
-                  new Date(tech.dbs_expiry_date) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
-                    ? 'text-amber-600'
-                    : 'text-gray-900'
-                }`}>
-                  {new Date(tech.dbs_expiry_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  {new Date(tech.dbs_expiry_date) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) && (
-                    <span className="ml-2 text-xs font-normal">⚠ expiring soon</span>
-                  )}
-                </dd>
-              </div>
-            )}  
+       
             <div>
               <dt className="text-gray-400">Start date</dt>
               <dd className="text-gray-900 mt-0.5">
@@ -166,6 +132,48 @@ export default async function TechnicianProfilePage({
             </div>
           )}
         </div>
+
+        {/* DBS */}
+<div className="bg-white rounded-xl border border-gray-100 p-5">
+  <h2 className="text-sm font-semibold text-gray-700 mb-4">DBS information</h2>
+  {tech.dbs_number ? (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+      <div>
+        <dt className="text-gray-400">DBS number</dt>
+        <dd className="text-gray-900 font-mono mt-0.5">{tech.dbs_number}</dd>
+      </div>
+      <div>
+        <dt className="text-gray-400">Certificate type</dt>
+        <dd className="text-gray-900 mt-0.5 capitalize">{tech.dbs_type ?? '—'}</dd>
+      </div>
+      <div>
+        <dt className="text-gray-400">Issue date</dt>
+        <dd className="text-gray-900 mt-0.5">
+          {tech.dbs_issue_date
+            ? new Date(tech.dbs_issue_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+            : '—'}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-gray-400">Expiry date</dt>
+        <dd className={`mt-0.5 font-medium ${
+          tech.dbs_expiry_date && new Date(tech.dbs_expiry_date) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+            ? 'text-amber-600'
+            : 'text-gray-900'
+        }`}>
+          {tech.dbs_expiry_date
+            ? new Date(tech.dbs_expiry_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+            : '—'}
+          {tech.dbs_expiry_date && new Date(tech.dbs_expiry_date) < new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) && (
+            <span className="ml-2 text-xs font-normal">⚠ expiring soon</span>
+          )}
+        </dd>
+      </div>
+    </dl>
+  ) : (
+    <p className="text-sm text-gray-400">No DBS information recorded</p>
+  )}
+</div>
 
         {/* Leaver / status actions */}
         {!isLeaver ? (

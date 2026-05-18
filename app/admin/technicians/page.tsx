@@ -43,7 +43,6 @@ export default async function TechniciansPage() {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Phone</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -62,7 +61,6 @@ export default async function TechniciansPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{tech.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{tech.phone ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                       tech.is_active
