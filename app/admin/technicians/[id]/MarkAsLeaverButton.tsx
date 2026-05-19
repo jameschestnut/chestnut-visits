@@ -11,13 +11,13 @@ export default function MarkAsLeaverButton({
   techId: string
   techName: string
 }) {
-  const router = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]           = useState(false)
   const [leavingDate, setLeavingDate] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState<string | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -26,10 +26,13 @@ export default function MarkAsLeaverButton({
     setLoading(true)
     setError(null)
 
-    // Set leaving date on technician
+    // Set leaving date and mark inactive
     const { error: techError } = await supabase
       .from('technicians')
-      .update({ leaving_date: leavingDate })
+      .update({
+        leaving_date: leavingDate,
+        is_active:    false,
+      })
       .eq('id', techId)
 
     if (techError) {
@@ -42,7 +45,7 @@ export default function MarkAsLeaverButton({
     const { error: visitError } = await supabase
       .from('visits')
       .update({
-        status: 'banked',
+        status:    'banked',
         banked_at: new Date().toISOString(),
       })
       .eq('technician_id', techId)
@@ -78,13 +81,11 @@ export default function MarkAsLeaverButton({
           Mark {techName} as a leaver
         </p>
         <p className="text-xs text-orange-600 mb-4">
-          All confirmed visits from the leaving date onwards will be automatically banked for reassignment.
+          The technician will be marked as inactive and all confirmed visits from the leaving date onwards will be automatically banked for reassignment.
         </p>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-orange-800 mb-1">
-            Leaving date
-          </label>
+          <label className="block text-sm font-medium text-orange-800 mb-1">Leaving date</label>
           <input
             type="date"
             min={today}
@@ -94,9 +95,7 @@ export default function MarkAsLeaverButton({
           />
         </div>
 
-        {error && (
-          <p className="text-xs text-red-600 mb-3">{error}</p>
-        )}
+        {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
 
         <div className="flex gap-2">
           <button

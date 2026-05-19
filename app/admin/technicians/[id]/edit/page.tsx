@@ -55,6 +55,8 @@ export default function EditTechnicianPage() {
           notes:           data.notes ?? '',
           is_active:       data.is_active ?? true,
           photo_url:       data.photo_url ?? '',
+          job_title:     data.job_title ?? '',
+          date_of_birth: data.date_of_birth ?? '',
         })
       }
       setLoading(false)
@@ -89,6 +91,8 @@ export default function EditTechnicianPage() {
         dbs_expiry_date: form.dbs_expiry_date || null,
         notes:           form.notes.trim() || null,
         is_active:       form.is_active,
+        job_title:     form.job_title.trim() || null,
+        date_of_birth: form.date_of_birth || null,
       })
       .eq('id', techId)
 
@@ -160,6 +164,21 @@ export default function EditTechnicianPage() {
               onChange={handleChange}
               className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 uppercase" />
           </div>
+
+          <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Job title</label>
+  <input name="job_title" type="text" value={form.job_title}
+    onChange={handleChange}
+    placeholder="e.g. Senior Technician"
+    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Date of birth</label>
+  <input name="date_of_birth" type="date" value={form.date_of_birth}
+    onChange={handleChange}
+    className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+</div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

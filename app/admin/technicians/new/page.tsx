@@ -23,6 +23,8 @@ export default function NewTechnicianPage() {
     dbs_issue_date: '',
     dbs_expiry_date: '',
     notes: '',
+    job_title:     '',
+    date_of_birth: '',
   })
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
@@ -62,6 +64,8 @@ export default function NewTechnicianPage() {
         dbs_expiry_date: form.dbs_expiry_date || null,
         notes:         form.notes.trim() || null,
         is_active:     true,
+        job_title:     form.job_title.trim() || null,
+        date_of_birth: form.date_of_birth || null,
       })
 
     if (error) {
@@ -120,6 +124,21 @@ export default function NewTechnicianPage() {
               className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 uppercase"
             />
           </div>
+
+          <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Job title</label>
+  <input name="job_title" type="text" value={form.job_title}
+    onChange={handleChange}
+    placeholder="e.g. Senior Technician"
+    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Date of birth</label>
+  <input name="date_of_birth" type="date" value={form.date_of_birth}
+    onChange={handleChange}
+    className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+</div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

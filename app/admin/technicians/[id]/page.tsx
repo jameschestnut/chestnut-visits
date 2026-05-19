@@ -35,8 +35,8 @@ export default async function TechnicianProfilePage({
     ) ?? []
 
   const SLOT_LABELS: Record<string, string> = {
-    am: 'AM only',
-    pm: 'PM only',
+    am: 'AM',
+    pm: 'PM',
     full_day: 'Full day',
   }
 
@@ -114,7 +114,15 @@ export default async function TechnicianProfilePage({
             <div>
               <dt className="text-gray-400">Home postcode</dt>
               <dd className="text-gray-900 font-mono mt-0.5">{tech.home_postcode ?? '—'}</dd>
-            </div>  
+            </div>
+            {tech.date_of_birth && (
+  <div>
+    <dt className="text-gray-400">Date of birth</dt>
+    <dd className="text-gray-900 mt-0.5">
+      {new Date(tech.date_of_birth + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+    </dd>
+  </div>
+)}
            
           </dl>
           {tech.notes && (
