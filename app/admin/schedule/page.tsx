@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
+import Link from 'next/link'
 
 const BRAND_GREEN = '#46DA26'
-
-// ── Visit type config ──────────────────────────────────────────────────────────
 
 const VISIT_TYPES: {
   value: string
@@ -14,14 +13,22 @@ const VISIT_TYPES: {
   needsSchool: boolean
   isAbsence: boolean
 }[] = [
-  { value: 'technology_partner', label: 'TP Visit',        colour: '#C0392B', needsSchool: true,  isAbsence: false },
-  { value: 'handover',           label: 'Handover',         colour: '#7A5C2E', needsSchool: true,  isAbsence: false },
-  { value: 'shadow',             label: 'Shadow',           colour: '#3D6B5E', needsSchool: true,  isAbsence: false },
-  { value: 'installation',       label: 'Installation',     colour: '#1D6FA4', needsSchool: true,  isAbsence: false },
-  { value: 'phone_duty',         label: 'Phone duty',       colour: '#1A6FA8', needsSchool: false, isAbsence: false },
-  { value: 'annual_leave',       label: 'Annual leave',     colour: '#94a3b8', needsSchool: false, isAbsence: true  },
-  { value: 'sickness',           label: 'Sickness',         colour: '#ef4444', needsSchool: false, isAbsence: true  },
-  { value: 'other_absence',      label: 'Other absence',    colour: '#a78bfa', needsSchool: false, isAbsence: true  },
+  { value: 'technology_partner', label: 'TP Visit',     colour: '#C0392B', needsSchool: true,  isAbsence: false },
+  { value: 'handover',           label: 'Handover',      colour: '#7A5C2E', needsSchool: true,  isAbsence: false },
+  { value: 'shadow',             label: 'Shadow',        colour: '#3D6B5E', needsSchool: true,  isAbsence: false },
+  { value: 'installation',       label: 'Installation',  colour: '#1D6FA4', needsSchool: true,  isAbsence: false },
+  { value: 'phone_duty',         label: 'Phone duty',    colour: '#1A6FA8', needsSchool: false, isAbsence: false },
+  { value: 'annual_leave',       label: 'Annual leave',  colour: '#94a3b8', needsSchool: false, isAbsence: true  },
+  { value: 'sickness',           label: 'Sickness',      colour: '#ef4444', needsSchool: false, isAbsence: true  },
+  { value: 'other_absence',      label: 'Other absence', colour: '#a78bfa', needsSchool: false, isAbsence: true  },
+]
+
+const DELETE_REASONS = [
+  'Created in error',
+  'Duplicate',
+  'School closed',
+  'Cancelled by school',
+  'Other',
 ]
 
 function getVisitTypeConfig(type: string) {
@@ -35,133 +42,73 @@ function hatchStyle(colour: string) {
   }
 }
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface Technician {
-  id: string
-  full_name: string
-  initials: string
-  photo_url: string | null
-}
-
+interface Technician { id: string; full_name: string; initials: string; photo_url: string | null }
 interface Visit {
-  id: string
-  school_id: string | null
-  technician_id: string
-  visit_date: string
-  slot: string
-  status: string
-  visit_type: string
-  travel_warning: boolean
-  notes: string | null
+  id: string; school_id: string | null; technician_id: string; visit_date: string
+  slot: string; status: string; visit_type: string; travel_warning: boolean; notes: string | null
   schools: { id: string; name: string; short_name: string | null } | null
 }
-
-interface School {
-  id: string
-  name: string
-  short_name: string | null
-}
-
-interface SidebarVisit {
-  id: string
-  school_id: string | null
-  school_name: string
-  visit_type: string
-  original_slot: string | null
-}
-
-interface PendingChange {
-  label: string
-  visitId: string
-  action: 'move' | 'bank'
-  newTechnicianId?: string
-  newDate?: string
-  newSlot?: string
-  newStatus?: string
-}
-
+interface School { id: string; name: string; short_name: string | null }
+interface SidebarVisit { id: string; school_id: string | null; school_name: string; visit_type: string; original_slot: string | null }
+interface PendingChange { label: string; visitId: string; action: 'move' | 'bank'; newTechnicianId?: string; newDate?: string; newSlot?: string; newStatus?: string }
 interface BankHoliday { holiday_date: string; name: string }
-interface TermDate    { start_date: string; end_date: string }
+interface TermDate { start_date: string; end_date: string }
 
-const SLOTS    = ['am', 'pm']
+const SLOTS = ['am', 'pm']
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri']
-
 const ROW_COLOURS = [
-  ['#fafafa', '#f5f5f5'],
-  ['#f0f9ff', '#e8f4fd'],
-  ['#fdf4ff', '#faf0fe'],
-  ['#f0fdf4', '#e8fdf0'],
-  ['#fffbf0', '#fef7e0'],
-  ['#fff0f0', '#fde8e8'],
-  ['#f0f0ff', '#e8e8fd'],
-  ['#f0ffff', '#e0fafa'],
+  ['#fafafa','#f5f5f5'],['#f0f9ff','#e8f4fd'],['#fdf4ff','#faf0fe'],['#f0fdf4','#e8fdf0'],
+  ['#fffbf0','#fef7e0'],['#fff0f0','#fde8e8'],['#f0f0ff','#e8e8fd'],['#f0ffff','#e0fafa'],
 ]
 
 function toDateStr(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
 function getWeekDates(offset: number) {
-  const today  = new Date()
+  const today = new Date()
   const monday = new Date(today)
-  const dow    = today.getDay()
+  const dow = today.getDay()
   monday.setDate(today.getDate() + (dow === 0 ? 1 : 1 - dow) + offset * 7)
   const todayStr = toDateStr(today)
   return DAY_KEYS.map((key, i) => {
     const date = new Date(monday)
     date.setDate(monday.getDate() + i)
-    return {
-      key, date,
-      dateStr: toDateStr(date),
-      label:   date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
-      isToday: toDateStr(date) === todayStr,
-    }
+    return { key, date, dateStr: toDateStr(date), label: date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }), isToday: toDateStr(date) === todayStr }
   })
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
-
 export default function WeeklyPlannerPage() {
   const supabase = createClient()
-
-  const [weekOffset, setWeekOffset]   = useState(0)
+  const [weekOffset, setWeekOffset] = useState(0)
   const [technicians, setTechnicians] = useState<Technician[]>([])
-  const [visits, setVisits]           = useState<Visit[]>([])
-  const [schools, setSchools]         = useState<School[]>([])
+  const [visits, setVisits] = useState<Visit[]>([])
+  const [schools, setSchools] = useState<School[]>([])
   const [bankHolidays, setBankHolidays] = useState<BankHoliday[]>([])
-  const [termDates, setTermDates]     = useState<TermDate[]>([])
-  const [sidebar, setSidebar]         = useState<SidebarVisit[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [pending, setPending]         = useState<PendingChange[]>([])
-  const [saving, setSaving]           = useState(false)
-  const [saved, setSaved]             = useState(false)
-  const [overSlot, setOverSlot]       = useState<string | null>(null)
+  const [termDates, setTermDates] = useState<TermDate[]>([])
+  const [sidebar, setSidebar] = useState<SidebarVisit[]>([])
+  const [loading, setLoading] = useState(true)
+  const [pending, setPending] = useState<PendingChange[]>([])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [overSlot, setOverSlot] = useState<string | null>(null)
   const [overSidebar, setOverSidebar] = useState(false)
 
-  // Slot popover
-  const [popover, setPopover] = useState<{
-    techId: string
-    techName: string
-    dateStr: string
-    slot: string
-  } | null>(null)
+  // Popover
+  const [popover, setPopover] = useState<{ techId: string; techName: string; dateStr: string; slot: string } | null>(null)
   const [popVisitType, setPopVisitType] = useState('annual_leave')
-  const [popSchoolId, setPopSchoolId]   = useState('')
-  const [popNotes, setPopNotes]         = useState('')
+  const [popSchoolId, setPopSchoolId] = useState('')
+  const [popNotes, setPopNotes] = useState('')
   const [popSchoolSearch, setPopSchoolSearch] = useState('')
-  const [savingPop, setSavingPop]       = useState(false)
+  const [savingPop, setSavingPop] = useState(false)
 
-  // Delete confirmation
+  // Delete
   const [deleteTarget, setDeleteTarget] = useState<Visit | null>(null)
-  const [deleting, setDeleting]         = useState(false)
+  const [deleteReason, setDeleteReason] = useState('')
+  const [deleteNotes, setDeleteNotes] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
-  const drag = useRef<{
-    source: 'grid' | 'sidebar'
-    visitId?: string
-    sidebarItem?: SidebarVisit
-  } | null>(null)
-
+  const drag = useRef<{ source: 'grid' | 'sidebar'; visitId?: string; sidebarItem?: SidebarVisit } | null>(null)
   const weekDates = getWeekDates(weekOffset)
 
   // ── Load ──────────────────────────────────────────────────────────────────────
@@ -171,44 +118,26 @@ export default function WeeklyPlannerPage() {
       setLoading(true)
       const weekStart = weekDates[0].dateStr
       const weekEnd   = weekDates[4].dateStr
-
       const [
-        { data: techs },
-        { data: weekVisits },
-        { data: bankedVisits },
-        { data: holidays },
-        { data: terms },
-        { data: schoolList },
+        { data: techs }, { data: weekVisits }, { data: bankedVisits },
+        { data: holidays }, { data: terms }, { data: schoolList },
       ] = await Promise.all([
         supabase.from('technicians').select('id, full_name, initials, photo_url').eq('is_active', true).order('full_name'),
-        supabase.from('visits').select(`
-          id, school_id, technician_id, visit_date, slot, status, visit_type,
-          travel_warning, notes, schools (id, name, short_name)
-        `).not('status', 'in', '("banked","completed")')
-          .gte('visit_date', weekStart)
-          .lte('visit_date', weekEnd),
-        supabase.from('visits').select(`
-  id, school_id, visit_type, slot, schools (id, name, short_name)
-`).eq('status', 'banked'),
+        supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).not('status','in','("banked","completed")').gte('visit_date', weekStart).lte('visit_date', weekEnd),
+        supabase.from('visits').select(`id, school_id, visit_type, slot, schools (id, name, short_name)`).eq('status', 'banked'),
         supabase.from('bank_holidays').select('holiday_date, name'),
         supabase.from('term_dates').select('start_date, end_date'),
         supabase.from('schools').select('id, name, short_name').eq('is_active', true).order('name'),
       ])
-
       setTechnicians(techs ?? [])
       setVisits(weekVisits ?? [])
       setBankHolidays(holidays ?? [])
       setTermDates(terms ?? [])
       setSchools(schoolList ?? [])
-      setSidebar((bankedVisits ?? []).map((v: {
-        id: string; school_id: string | null; visit_type: string; original_slot: string | null
-        schools: { id: string; name: string; short_name: string | null } | null
-      }) => ({
-        id:            v.id,
-        school_id:     v.school_id,
-        school_name:   v.schools?.short_name || v.schools?.name || 'No school',
-        visit_type:    v.visit_type,
-        original_slot: v.slot
+      setSidebar((bankedVisits ?? []).map((v: { id: string; school_id: string | null; visit_type: string; slot: string; schools: { id: string; name: string; short_name: string | null } | null }) => ({
+        id: v.id, school_id: v.school_id,
+        school_name: v.schools?.short_name || v.schools?.name || 'No school',
+        visit_type: v.visit_type, original_slot: v.slot,
       })))
       setLoading(false)
     }
@@ -217,80 +146,41 @@ export default function WeeklyPlannerPage() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
-  function isBankHoliday(dateStr: string): BankHoliday | null {
-    return bankHolidays.find(h => h.holiday_date === dateStr) ?? null
-  }
-
-  function isInTerm(dateStr: string): boolean {
-    return termDates.some(t => dateStr >= t.start_date && dateStr <= t.end_date)
-  }
-
-  function getVisit(techId: string, dateStr: string, slot: string): Visit | null {
-    return visits.find(v =>
-      v.technician_id === techId &&
-      v.visit_date    === dateStr &&
-      v.slot          === slot
-    ) ?? null
-  }
-
-  // Are both AM and PM the same visit type for this tech+date? → merge into full day
+  function isBankHoliday(dateStr: string): BankHoliday | null { return bankHolidays.find(h => h.holiday_date === dateStr) ?? null }
+  function isInTerm(dateStr: string): boolean { return termDates.some(t => dateStr >= t.start_date && dateStr <= t.end_date) }
+  function getVisit(techId: string, dateStr: string, slot: string): Visit | null { return visits.find(v => v.technician_id === techId && v.visit_date === dateStr && v.slot === slot) ?? null }
   function getFullDayMerge(techId: string, dateStr: string): string | null {
     const am = getVisit(techId, dateStr, 'am')
     const pm = getVisit(techId, dateStr, 'pm')
-    if (am && pm && am.visit_type === pm.visit_type && am.school_id === pm.school_id) {
-      return am.visit_type
-    }
+    if (am && pm && am.visit_type === pm.visit_type && am.school_id === pm.school_id) return am.visit_type
     return null
   }
-
-  function isSlotFree(techId: string, dateStr: string, slot: string): boolean {
-    return !getVisit(techId, dateStr, slot)
-  }
+  function isSlotFree(techId: string, dateStr: string, slot: string): boolean { return !getVisit(techId, dateStr, slot) }
 
   // ── Drag ──────────────────────────────────────────────────────────────────────
 
-  function onDragStartGrid(visit: Visit) {
-    drag.current = { source: 'grid', visitId: visit.id }
-  }
-
-  function onDragStartSidebar(item: SidebarVisit) {
-    drag.current = { source: 'sidebar', sidebarItem: item }
-  }
+  function onDragStartGrid(visit: Visit) { drag.current = { source: 'grid', visitId: visit.id } }
+  function onDragStartSidebar(item: SidebarVisit) { drag.current = { source: 'sidebar', sidebarItem: item } }
 
   function onDragOver(e: React.DragEvent, techId: string, dateStr: string, slot: string) {
     e.preventDefault()
-    if (isSlotFree(techId, dateStr, slot)) {
-      setOverSlot(`${techId}-${dateStr}-${slot}`)
-      setOverSidebar(false)
-    }
+    if (isSlotFree(techId, dateStr, slot)) { setOverSlot(`${techId}-${dateStr}-${slot}`); setOverSidebar(false) }
   }
 
   function onDrop(e: React.DragEvent, targetTech: string, targetDate: string, targetSlot: string) {
     e.preventDefault(); setOverSlot(null)
     if (!drag.current || !isSlotFree(targetTech, targetDate, targetSlot)) return
-
     if (drag.current.source === 'grid' && drag.current.visitId) {
       const visitId = drag.current.visitId
-      const visit   = visits.find(v => v.id === visitId)
+      const visit = visits.find(v => v.id === visitId)
       if (!visit || (visit.technician_id === targetTech && visit.visit_date === targetDate && visit.slot === targetSlot)) return
       setVisits(prev => prev.map(v => v.id === visitId ? { ...v, technician_id: targetTech, visit_date: targetDate, slot: targetSlot } : v))
-      setPending(prev => [...prev, {
-        label: `${visit.schools?.short_name || visit.schools?.name || getVisitTypeConfig(visit.visit_type).label}: → ${targetDate} ${targetSlot.toUpperCase()}`,
-        visitId, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot,
-      }])
+      setPending(prev => [...prev, { label: `${visit.schools?.short_name || visit.schools?.name || getVisitTypeConfig(visit.visit_type).label}: → ${targetDate} ${targetSlot.toUpperCase()}`, visitId, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot }])
     } else if (drag.current.source === 'sidebar' && drag.current.sidebarItem) {
       const item = drag.current.sidebarItem
-      setVisits(prev => [...prev, {
-        id: item.id, school_id: item.school_id, technician_id: targetTech,
-        visit_date: targetDate, slot: targetSlot, status: 'confirmed',
-        visit_type: item.visit_type, travel_warning: false, notes: null,
-        schools: item.school_id ? { id: item.school_id, name: item.school_name, short_name: null } : null,
-      }])
+      setVisits(prev => [...prev, { id: item.id, school_id: item.school_id, technician_id: targetTech, visit_date: targetDate, slot: targetSlot, status: 'confirmed', visit_type: item.visit_type, travel_warning: false, notes: null, schools: item.school_id ? { id: item.school_id, name: item.school_name, short_name: null } : null }])
       setSidebar(prev => prev.filter(s => s.id !== item.id))
-      setPending(prev => [...prev, {
-        label: `${item.school_name}: scheduled ${targetDate} ${targetSlot.toUpperCase()}`,
-        visitId: item.id, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot, newStatus: 'confirmed',
-      }])
+      setPending(prev => [...prev, { label: `${item.school_name}: scheduled ${targetDate} ${targetSlot.toUpperCase()}`, visitId: item.id, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot, newStatus: 'confirmed' }])
     }
     drag.current = null
   }
@@ -303,25 +193,18 @@ export default function WeeklyPlannerPage() {
     const visit = visits.find(v => v.id === drag.current!.visitId)
     if (!visit) return
     const cfg = getVisitTypeConfig(visit.visit_type)
-    if (cfg.isAbsence) return // don't bank absences — delete instead
-    setSidebar(prev => [...prev, {
-      id: visit.id, school_id: visit.school_id,
-      school_name: visit.schools?.short_name || visit.schools?.name || 'Unknown',
-      visit_type: visit.visit_type, original_slot: visit.slot,
-    }])
+    if (cfg.isAbsence) return
+    setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: visit.schools?.short_name || visit.schools?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot }])
     setVisits(prev => prev.filter(v => v.id !== drag.current!.visitId))
     setPending(prev => [...prev, { label: `${visit.schools?.short_name || visit.schools?.name}: banked`, visitId: visit.id, action: 'bank' }])
     drag.current = null
   }
 
-  // ── Slot popover ──────────────────────────────────────────────────────────────
+  // ── Popover ───────────────────────────────────────────────────────────────────
 
   function openPopover(techId: string, techName: string, dateStr: string, slot: string) {
     setPopover({ techId, techName, dateStr, slot })
-    setPopVisitType('annual_leave')
-    setPopSchoolId('')
-    setPopNotes('')
-    setPopSchoolSearch('')
+    setPopVisitType('annual_leave'); setPopSchoolId(''); setPopNotes(''); setPopSchoolSearch('')
   }
 
   async function savePopover() {
@@ -329,81 +212,45 @@ export default function WeeklyPlannerPage() {
     const cfg = getVisitTypeConfig(popVisitType)
     if (cfg.needsSchool && !popSchoolId) return
     setSavingPop(true)
+    const { data: newVisit, error } = await supabase.from('visits').insert({
+      technician_id: popover.techId, visit_date: popover.dateStr, slot: popover.slot,
+      visit_type: popVisitType, school_id: cfg.needsSchool ? popSchoolId : null,
+      status: 'confirmed', notes: popNotes.trim() || null,
+    }).select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).single()
 
-    const school = schools.find(s => s.id === popSchoolId)
-
- const { data: newVisit, error } = await supabase
-  .from('visits')
-  .insert({
-    technician_id: popover.techId,
-    visit_date:    popover.dateStr,
-    slot:          popover.slot,
-    visit_type:    popVisitType,
-    school_id:     cfg.needsSchool ? popSchoolId : null,
-    status:        'confirmed',
-    notes:         popNotes.trim() || null,
-  })
-  .select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`)
-  .single()
-
-if (!error && newVisit) {
-  // Reload visits for the week to get fresh data including the new visit
-  const { data: refreshed } = await supabase
-    .from('visits')
-    .select(`
-      id, school_id, technician_id, visit_date, slot, status, visit_type,
-      travel_warning, notes, schools (id, name, short_name)
-    `)
-    .not('status', 'in', '("banked","completed")')
-    .gte('visit_date', weekDates[0].dateStr)
-    .lte('visit_date', weekDates[4].dateStr)
-
-  setVisits(refreshed ?? [])
-}
-setSavingPop(false)
-setPopover(null)
+    if (!error) {
+      const { data: refreshed } = await supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).not('status','in','("banked","completed")').gte('visit_date', weekDates[0].dateStr).lte('visit_date', weekDates[4].dateStr)
+      setVisits(refreshed ?? [])
+    }
+    setSavingPop(false); setPopover(null)
   }
-  // ── Delete visit ──────────────────────────────────────────────────────────────
+
+  // ── Delete ────────────────────────────────────────────────────────────────────
 
   async function handleDelete() {
-  if (!deleteTarget) return
-  setDeleting(true)
+    if (!deleteTarget || !deleteReason) return
+    setDeleting(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const pairedSlot = deleteTarget.slot === 'am' ? 'pm' : 'am'
+    const paired = visits.find(v => v.technician_id === deleteTarget.technician_id && v.visit_date === deleteTarget.visit_date && v.slot === pairedSlot && v.visit_type === deleteTarget.visit_type && v.school_id === deleteTarget.school_id)
+    const toDelete = [deleteTarget, ...(paired ? [paired] : [])]
+    const fullReason = deleteNotes.trim() ? `${deleteReason} — ${deleteNotes.trim()}` : deleteReason
+    for (const v of toDelete) {
+      await supabase.from('visit_deletions').insert({ visit_date: v.visit_date, school_id: v.school_id, technician_id: v.technician_id, slot: v.slot, visit_type: v.visit_type, reason: fullReason, deleted_by: user?.id ?? null })
+      await supabase.from('visits').delete().eq('id', v.id)
+    }
+    setVisits(prev => prev.filter(v => !toDelete.map(d => d.id).includes(v.id)))
+    setDeleting(false); setDeleteTarget(null)
+  }
 
-  // Check if this is part of a full-day merge — if so delete the paired slot too
-  const pairedSlot = deleteTarget.slot === 'am' ? 'pm' : 'am'
-  const paired = visits.find(v =>
-    v.technician_id === deleteTarget.technician_id &&
-    v.visit_date    === deleteTarget.visit_date &&
-    v.slot          === pairedSlot &&
-    v.visit_type    === deleteTarget.visit_type &&
-    v.school_id     === deleteTarget.school_id
-  )
-
-  const idsToDelete = [deleteTarget.id, ...(paired ? [paired.id] : [])]
-
-  await supabase.from('visits').delete().in('id', idsToDelete)
-  setVisits(prev => prev.filter(v => !idsToDelete.includes(v.id)))
-  setDeleting(false)
-  setDeleteTarget(null)
-}
-
-  // ── Confirm pending ───────────────────────────────────────────────────────────
+  // ── Confirm ───────────────────────────────────────────────────────────────────
 
   async function handleConfirm() {
     if (pending.length === 0) return
     setSaving(true)
     for (const change of pending) {
-      if (change.action === 'move') {
-        await supabase.from('visits').update({
-          technician_id: change.newTechnicianId,
-          visit_date:    change.newDate,
-          slot:          change.newSlot,
-          status:        change.newStatus ?? 'confirmed',
-          ...(change.newStatus === 'confirmed' ? { banked_at: null } : {}),
-        }).eq('id', change.visitId)
-      } else if (change.action === 'bank') {
-        await supabase.from('visits').update({ status: 'banked', banked_at: new Date().toISOString() }).eq('id', change.visitId)
-      }
+      if (change.action === 'move') await supabase.from('visits').update({ technician_id: change.newTechnicianId, visit_date: change.newDate, slot: change.newSlot, status: change.newStatus ?? 'confirmed', ...(change.newStatus === 'confirmed' ? { banked_at: null } : {}) }).eq('id', change.visitId)
+      else if (change.action === 'bank') await supabase.from('visits').update({ status: 'banked', banked_at: new Date().toISOString() }).eq('id', change.visitId)
     }
     setSaving(false); setSaved(true); setPending([])
     setTimeout(() => setSaved(false), 3000)
@@ -417,7 +264,7 @@ setPopover(null)
   if (loading) return <div className="flex items-center justify-center py-20"><p className="text-sm text-gray-400">Loading planner...</p></div>
 
   return (
-    <div className="max-w-full">
+    <div>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -445,21 +292,20 @@ setPopover(null)
 
       <div className="flex gap-3">
 
-        {/* Grid */}
-        <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <table className="w-full border-collapse text-xs">
+        {/* Grid — horizontally scrollable */}
+        <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <table className="border-collapse text-xs" style={{ minWidth: 700 }}>
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-3 py-2.5 font-medium text-gray-500 w-28 border-r border-gray-100">Technician</th>
-                <th className="px-2 py-2.5 text-gray-400 font-normal w-9 text-center border-r border-gray-100">Slot</th>
+                <th className="text-left px-3 py-2.5 font-medium text-gray-500 border-r border-gray-100 sticky left-0 bg-gray-50 z-10" style={{ minWidth: 120 }}>Technician</th>
+                <th className="px-2 py-2.5 text-gray-400 font-normal text-center border-r border-gray-100" style={{ minWidth: 44 }}>Slot</th>
                 {weekDates.map(d => {
-                  const bh     = isBankHoliday(d.dateStr)
+                  const bh = isBankHoliday(d.dateStr)
                   const inTerm = isInTerm(d.dateStr)
                   return (
-                    <th key={d.key} className="px-2 py-2 font-medium text-center border-r border-gray-100 last:border-r-0"
-                      style={{ minWidth: 120, background: d.isToday ? BRAND_GREEN : bh ? '#fee2e2' : !inTerm ? '#f1f5f9' : undefined, color: d.isToday ? 'white' : bh ? '#991b1b' : !inTerm ? '#94a3b8' : '#374151' }}>
+                    <th key={d.key} className="px-2 py-2 font-medium text-center border-r border-gray-100 last:border-r-0" style={{ minWidth: 130, background: d.isToday ? BRAND_GREEN : bh ? '#fee2e2' : !inTerm ? '#f1f5f9' : undefined, color: d.isToday ? 'white' : bh ? '#991b1b' : !inTerm ? '#94a3b8' : '#374151' }}>
                       <div>{d.label}</div>
-                      {bh      && <div className="text-xs font-normal opacity-75 mt-0.5 truncate">{bh.name}</div>}
+                      {bh && <div className="text-xs font-normal opacity-75 mt-0.5 truncate">{bh.name}</div>}
                       {!bh && !inTerm && <div className="text-xs font-normal opacity-60 mt-0.5">Holiday</div>}
                     </th>
                   )
@@ -469,97 +315,69 @@ setPopover(null)
             <tbody>
               {technicians.map((tech, ti) => {
                 const [amBg, pmBg] = ROW_COLOURS[ti % ROW_COLOURS.length]
-
                 return SLOTS.map((slot, si) => (
-                  <tr key={`${tech.id}-${slot}`} className="border-b border-gray-100 last:border-b-0"
-                    style={{ background: slot === 'am' ? amBg : pmBg }}>
+                  <tr key={`${tech.id}-${slot}`} className="border-b border-gray-100 last:border-b-0" style={{ background: slot === 'am' ? amBg : pmBg }}>
 
-                    {/* Tech label */}
+                    {/* Tech label — sticky, clickable, AM row only */}
                     {si === 0 ? (
-                      <td rowSpan={2} className="px-3 py-2 border-r border-gray-100 align-middle" style={{ background: amBg }}>
-                        <div className="flex items-center gap-2">
+                      <td rowSpan={2} className="px-3 py-2 border-r border-gray-100 align-middle sticky left-0 z-10" style={{ background: amBg }}>
+                        <Link href={`/admin/technicians/${tech.id}`} className="flex items-center gap-2 hover:opacity-75 transition-opacity">
                           {tech.photo_url ? (
                             <img src={tech.photo_url} alt={tech.full_name} className="w-7 h-7 rounded-full object-cover shrink-0" />
                           ) : (
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                              style={{ background: BRAND_GREEN }}>{tech.initials}</div>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: BRAND_GREEN }}>{tech.initials}</div>
                           )}
                           <span className="font-semibold text-gray-800 truncate text-xs">{tech.full_name.split(' ')[0]}</span>
-                        </div>
+                        </Link>
                       </td>
                     ) : null}
 
                     {/* Slot badge */}
                     <td className="px-1 py-1 text-center border-r border-gray-100" style={{ background: slot === 'am' ? amBg : pmBg }}>
-                      <span className={`text-xs font-medium px-1 py-0.5 rounded ${slot === 'am' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100'}`}>
-                        {slot.toUpperCase()}
-                      </span>
+                      <span className={`text-xs font-medium px-1 py-0.5 rounded ${slot === 'am' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100'}`}>{slot.toUpperCase()}</span>
                     </td>
 
                     {/* Day cells */}
                     {weekDates.map(d => {
-                      const visit       = getVisit(tech.id, d.dateStr, slot)
-                      const mergeType   = slot === 'am' ? getFullDayMerge(tech.id, d.dateStr) : null
+                      const visit = getVisit(tech.id, d.dateStr, slot)
+                      const mergeType = slot === 'am' ? getFullDayMerge(tech.id, d.dateStr) : null
                       const isBottomOfMerge = slot === 'pm' && getFullDayMerge(tech.id, d.dateStr) !== null
-                      const slotKey     = `${tech.id}-${d.dateStr}-${slot}`
-                      const isOver      = overSlot === slotKey
-                      const bh          = isBankHoliday(d.dateStr)
-                      const inTerm      = isInTerm(d.dateStr)
-                      const todayStr    = weekDates.find(w => w.isToday)?.dateStr ?? ''
-                      const isPast      = d.dateStr < todayStr && !d.isToday
-                      const cellBg      = bh ? '#fef2f2' : !inTerm ? '#f8fafc' : slot === 'am' ? amBg : pmBg
-                      const cfg         = visit ? getVisitTypeConfig(visit.visit_type) : null
+                      const slotKey = `${tech.id}-${d.dateStr}-${slot}`
+                      const isOver = overSlot === slotKey
+                      const bh = isBankHoliday(d.dateStr)
+                      const inTerm = isInTerm(d.dateStr)
+                      const todayStr = weekDates.find(w => w.isToday)?.dateStr ?? ''
+                      const isPast = d.dateStr < todayStr && !d.isToday
+                      const cellBg = bh ? '#fef2f2' : !inTerm ? '#f8fafc' : slot === 'am' ? amBg : pmBg
+                      const cfg = visit ? getVisitTypeConfig(visit.visit_type) : null
 
-                      // Skip PM cell if this day is a full-day merge
                       if (isBottomOfMerge) return <td key={d.key} className="border-r border-gray-100 last:border-r-0" style={{ background: cellBg }} />
 
                       return (
-                        <td key={d.key}
-                          className="px-1 py-1 border-r border-gray-100 last:border-r-0"
-                          style={{ minWidth: 120, background: cellBg, opacity: isPast ? 0.6 : 1 }}
-                          rowSpan={mergeType ? 2 : 1}>
+                        <td key={d.key} className="px-1 py-1 border-r border-gray-100 last:border-r-0" style={{ minWidth: 130, background: cellBg, opacity: isPast ? 0.6 : 1 }} rowSpan={mergeType ? 2 : 1}>
 
-                          {/* Holiday cell */}
                           {(bh || !inTerm) && !visit ? (
-                            <div className="rounded text-xs flex items-center justify-center"
-                              style={{ minHeight: mergeType ? 62 : 30, background: bh ? '#fee2e220' : '#f1f5f920', border: `1px solid ${bh ? '#fca5a5' : '#cbd5e1'}`, color: bh ? '#b91c1c' : '#94a3b8' }}>
+                            <div className="rounded text-xs flex items-center justify-center" style={{ minHeight: mergeType ? 62 : 30, background: bh ? '#fee2e220' : '#f1f5f920', border: `1px solid ${bh ? '#fca5a5' : '#cbd5e1'}`, color: bh ? '#b91c1c' : '#94a3b8' }}>
                               {bh ? '🏦' : '🏖️'}
                             </div>
-
                           ) : visit ? (
                             <div
                               draggable={!cfg?.isAbsence}
                               onDragStart={() => !cfg?.isAbsence && onDragStartGrid(visit)}
                               className={`rounded text-xs font-medium flex items-center justify-between gap-1 px-1.5 py-1 select-none ${!cfg?.isAbsence ? 'cursor-grab active:cursor-grabbing' : ''} ${visit.status === 'completed' ? 'opacity-60' : ''}`}
-                              style={{
-                                minHeight: mergeType ? 62 : 30,
-                                ...(cfg?.isAbsence
-                                  ? { ...hatchStyle(cfg.colour), color: cfg.colour }
-                                  : { background: cfg?.colour ?? '#C0392B', color: 'white' }
-                                ),
-                              }}
+                              style={{ minHeight: mergeType ? 62 : 30, ...(cfg?.isAbsence ? { ...hatchStyle(cfg.colour), color: cfg.colour } : { background: cfg?.colour ?? '#C0392B', color: 'white' }) }}
                               title={visit.schools?.name ?? cfg?.label ?? ''}
                             >
                               <span className="truncate">
-                                {cfg?.isAbsence
-                                  ? cfg.label
-                                  : visit.visit_type === 'phone_duty'
-                                  ? '📞 Phone duty'
-                                  : visit.schools?.short_name || visit.schools?.name?.split(' ')[0]}
+                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞 Phone duty' : visit.schools?.short_name || visit.schools?.name?.split(' ')[0]}
                               </span>
                               <div className="flex items-center gap-0.5 shrink-0">
                                 {visit.travel_warning && <span className="text-yellow-300">⚠</span>}
                                 {visit.status === 'completed' && <span>✓</span>}
-                                <button
-                                  onClick={() => setDeleteTarget(visit)}
-                                  className="opacity-40 hover:opacity-100 ml-0.5 text-xs"
-                                  title="Remove"
-                                >✕</button>
+                                <button onClick={() => { setDeleteTarget(visit); setDeleteReason(''); setDeleteNotes('') }} className="opacity-40 hover:opacity-100 ml-0.5 text-xs" title="Delete">✕</button>
                               </div>
                             </div>
-
                           ) : (
-                            /* Empty slot — droppable + clickable */
                             <div
                               onDragOver={e => onDragOver(e, tech.id, d.dateStr, slot)}
                               onDrop={e => onDrop(e, tech.id, d.dateStr, slot)}
@@ -582,15 +400,9 @@ setPopover(null)
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 border-t border-gray-100 bg-gray-50">
             {VISIT_TYPES.filter(t => !t.isAbsence).map(t => (
-              <div key={t.value} className="flex items-center gap-1.5 text-xs text-gray-500">
-                <div className="w-3 h-3 rounded-sm" style={{ background: t.colour }} />{t.label}
-              </div>
+              <div key={t.value} className="flex items-center gap-1.5 text-xs text-gray-500"><div className="w-3 h-3 rounded-sm" style={{ background: t.colour }} />{t.label}</div>
             ))}
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <div className="w-3 h-3 rounded-sm border border-gray-400"
-                style={{ background: 'repeating-linear-gradient(45deg,#94a3b8,#94a3b8 2px,transparent 2px,transparent 5px)' }} />
-              Absence
-            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500"><div className="w-3 h-3 rounded-sm border border-gray-300" style={{ background: 'repeating-linear-gradient(45deg,#94a3b8,#94a3b8 2px,transparent 2px,transparent 5px)' }} />Absence</div>
             <div className="flex items-center gap-1.5 text-xs text-gray-500">🏦 Bank holiday</div>
             <div className="flex items-center gap-1.5 text-xs text-gray-500">🏖️ Holiday</div>
             <div className="flex items-center gap-1.5 text-xs text-gray-500">✓ Completed</div>
@@ -635,7 +447,7 @@ setPopover(null)
         </div>
       </div>
 
-      {/* Slot popover — add any visit type */}
+      {/* Slot popover */}
       {popover && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setPopover(null)}>
           <div className="absolute inset-0 bg-black/20" />
@@ -644,69 +456,45 @@ setPopover(null)
             <p className="text-xs text-gray-500 mb-4">
               {popover.techName} · {new Date(popover.dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {popover.slot.toUpperCase()}
             </p>
-
-            {/* Visit type */}
             <div className="mb-4">
               <p className="text-xs font-medium text-gray-700 mb-2">Type</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {VISIT_TYPES.map(t => (
-                  <label key={t.value}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors ${
-                      popVisitType === t.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}>
-                    <input type="radio" name="visittype" value={t.value} checked={popVisitType === t.value}
-                      onChange={() => { setPopVisitType(t.value); setPopSchoolId(''); setPopSchoolSearch('') }}
-                      className="sr-only" />
+                  <label key={t.value} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors ${popVisitType === t.value ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                    <input type="radio" name="visittype" value={t.value} checked={popVisitType === t.value} onChange={() => { setPopVisitType(t.value); setPopSchoolId(''); setPopSchoolSearch('') }} className="sr-only" />
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ background: t.colour }} />
                     {t.label}
                   </label>
                 ))}
               </div>
             </div>
-
-            {/* School picker — only for visit types that need a school */}
             {getVisitTypeConfig(popVisitType).needsSchool && (
               <div className="mb-4">
                 <p className="text-xs font-medium text-gray-700 mb-1">School <span className="text-red-500">*</span></p>
-                <input
-                  type="text"
-                  value={popSchoolSearch}
-                  onChange={e => setPopSchoolSearch(e.target.value)}
-                  placeholder="Search schools..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 mb-1"
-                />
+                <input type="text" value={popSchoolSearch} onChange={e => setPopSchoolSearch(e.target.value)} placeholder="Search schools..."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 mb-1" />
                 <div className="max-h-32 overflow-auto border border-gray-100 rounded-lg">
                   {filteredSchools.slice(0, 8).map(s => (
                     <button key={s.id} onClick={() => { setPopSchoolId(s.id); setPopSchoolSearch(s.short_name || s.name) }}
                       className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 ${popSchoolId === s.id ? 'bg-gray-100 font-medium' : ''}`}>
-                      {s.name}
-                      {s.short_name && <span className="text-gray-400 ml-1">({s.short_name})</span>}
+                      {s.name}{s.short_name && <span className="text-gray-400 ml-1">({s.short_name})</span>}
                     </button>
                   ))}
                   {filteredSchools.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No schools found</p>}
                 </div>
               </div>
             )}
-
-            {/* Notes */}
             <div className="mb-4">
               <p className="text-xs font-medium text-gray-700 mb-1">Notes <span className="text-gray-400">(optional)</span></p>
-              <input type="text" value={popNotes} onChange={e => setPopNotes(e.target.value)}
-                placeholder="Any additional notes..."
+              <input type="text" value={popNotes} onChange={e => setPopNotes(e.target.value)} placeholder="Any additional notes..."
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
             </div>
-
             <div className="flex gap-2">
-              <button onClick={savePopover}
-                disabled={savingPop || (getVisitTypeConfig(popVisitType).needsSchool && !popSchoolId)}
-                className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-                style={{ background: BRAND_GREEN }}>
+              <button onClick={savePopover} disabled={savingPop || (getVisitTypeConfig(popVisitType).needsSchool && !popSchoolId)}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ background: BRAND_GREEN }}>
                 {savingPop ? 'Saving…' : 'Add to slot'}
               </button>
-              <button onClick={() => setPopover(null)}
-                className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
-                Cancel
-              </button>
+              <button onClick={() => setPopover(null)} className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
             </div>
           </div>
         </div>
@@ -716,33 +504,38 @@ setPopover(null)
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setDeleteTarget(null)}>
           <div className="absolute inset-0 bg-black/20" />
-          <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-72" onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Remove this slot?</h3>
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Delete visit</h3>
             <p className="text-xs text-gray-500 mb-4">
               {getVisitTypeConfig(deleteTarget.visit_type).label}
               {deleteTarget.schools ? ` — ${deleteTarget.schools.name}` : ''}
               {' · '}{new Date(deleteTarget.visit_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               {' · '}{deleteTarget.slot.toUpperCase()}
+              {getFullDayMerge(deleteTarget.technician_id, deleteTarget.visit_date) ? ' · full day (both slots)' : ''}
             </p>
-            <p className="text-xs text-gray-400 mb-4">
-              {getVisitTypeConfig(deleteTarget.visit_type).isAbsence
-                ? 'This absence record will be permanently removed.'
-                : 'The visit will be permanently deleted. Use the sidebar to bank it instead if you want to reschedule.'}
-            </p>
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></p>
+              <select value={deleteReason} onChange={e => setDeleteReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900">
+                <option value="">Select a reason...</option>
+                {DELETE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-700 mb-1">Notes <span className="text-gray-400">(optional)</span></p>
+              <input type="text" value={deleteNotes} onChange={e => setDeleteNotes(e.target.value)} placeholder="Any additional detail..."
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+            </div>
             <div className="flex gap-2">
-              <button onClick={handleDelete} disabled={deleting}
+              <button onClick={handleDelete} disabled={deleting || !deleteReason}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
-                {deleting ? 'Removing…' : 'Remove'}
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
-              <button onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
-                Cancel
-              </button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   )
 }
