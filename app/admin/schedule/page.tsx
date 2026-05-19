@@ -101,6 +101,7 @@ export default function WeeklyPlannerPage() {
   const [popNotes, setPopNotes] = useState('')
   const [popSchoolSearch, setPopSchoolSearch] = useState('')
   const [savingPop, setSavingPop] = useState(false)
+  const [popAddToBank, setPopAddToBank] = useState(false)
 
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<Visit | null>(null)
@@ -205,25 +206,55 @@ export default function WeeklyPlannerPage() {
   function openPopover(techId: string, techName: string, dateStr: string, slot: string) {
     setPopover({ techId, techName, dateStr, slot })
     setPopVisitType('annual_leave'); setPopSchoolId(''); setPopNotes(''); setPopSchoolSearch('')
+    setPopAddToBank(false)
   }
 
-  async function savePopover() {
-    if (!popover) return
-    const cfg = getVisitTypeConfig(popVisitType)
-    if (cfg.needsSchool && !popSchoolId) return
-    setSavingPop(true)
-    const { data: newVisit, error } = await supabase.from('visits').insert({
-      technician_id: popover.techId, visit_date: popover.dateStr, slot: popover.slot,
-      visit_type: popVisitType, school_id: cfg.needsSchool ? popSchoolId : null,
-      status: 'confirmed', notes: popNotes.trim() || null,
-    }).select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).single()
+async function savePopover() {
+  if (!popover) return
+  const cfg = getVisitTypeConfig(popVisitType)
+  if (cfg.needsSchool && !popSchoolId) return
+  setSavingPop(true)
 
-    if (!error) {
-      const { data: refreshed } = await supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).not('status','in','("banked","completed")').gte('visit_date', weekDates[0].dateStr).lte('visit_date', weekDates[4].dateStr)
+  const { data: newVisit, error } = await supabase
+    .from('visits')
+    .insert({
+      technician_id: popover.techId,
+      visit_date:    popover.dateStr,
+      slot:          popover.slot,
+      visit_type:    popVisitType,
+      school_id:     cfg.needsSchool ? popSchoolId : null,
+      status:        popAddToBank ? 'banked' : 'confirmed',
+      banked_at:     popAddToBank ? new Date().toISOString() : null,
+      notes:         popNotes.trim() || null,
+    })
+    .select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`)
+    .single()
+
+  if (!error && newVisit) {
+    if (popAddToBank) {
+      // Add to sidebar bank
+      const school = schools.find(s => s.id === popSchoolId)
+      setSidebar(prev => [...prev, {
+        id:            newVisit.id,
+        school_id:     newVisit.school_id,
+        school_name:   school?.short_name || school?.name || 'No school',
+        visit_type:    newVisit.visit_type,
+        original_slot: newVisit.slot,
+      }])
+    } else {
+      // Refresh grid visits
+      const { data: refreshed } = await supabase
+        .from('visits')
+        .select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`)
+        .not('status', 'in', '("banked","completed")')
+        .gte('visit_date', weekDates[0].dateStr)
+        .lte('visit_date', weekDates[4].dateStr)
       setVisits(refreshed ?? [])
     }
-    setSavingPop(false); setPopover(null)
   }
+  setSavingPop(false)
+  setPopover(null)
+}
 
   // ── Delete ────────────────────────────────────────────────────────────────────
 
@@ -484,6 +515,21 @@ export default function WeeklyPlannerPage() {
                 </div>
               </div>
             )}
+            {/* Add to bank toggle */}
+<div className="mb-4">
+  <label className="flex items-center gap-2.5 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={popAddToBank}
+      onChange={e => setPopAddToBank(e.target.checked)}
+      className="accent-gray-900"
+    />
+    <div>
+      <p className="text-xs font-medium text-gray-700">Add to visit bank</p>
+      <p className="text-xs text-gray-400 mt-0.5">Place in the sidebar to schedule later via the planner</p>
+    </div>
+  </label>
+</div>
             <div className="mb-4">
               <p className="text-xs font-medium text-gray-700 mb-1">Notes <span className="text-gray-400">(optional)</span></p>
               <input type="text" value={popNotes} onChange={e => setPopNotes(e.target.value)} placeholder="Any additional notes..."
@@ -492,7 +538,7 @@ export default function WeeklyPlannerPage() {
             <div className="flex gap-2">
               <button onClick={savePopover} disabled={savingPop || (getVisitTypeConfig(popVisitType).needsSchool && !popSchoolId)}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ background: BRAND_GREEN }}>
-                {savingPop ? 'Saving…' : 'Add to slot'}
+                {savingPop ? 'Saving…' : popAddToBank ? 'Add to bank' : 'Add to slot'}
               </button>
               <button onClick={() => setPopover(null)} className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
             </div>
