@@ -2,6 +2,14 @@ import { createServiceSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+const VISIT_TYPE_LABELS: Record<string, string> = {
+  technology_partner: 'TP Visit',
+  handover:           'Handover',
+  shadow:             'Shadow',
+  installation:       'Installation',
+  phone_duty:         'Phone duty',
+}
+
 export default async function SchoolProfilePage({
   params,
 }: {
@@ -10,18 +18,20 @@ export default async function SchoolProfilePage({
   const { id } = await params
   const supabase = await createServiceSupabaseClient()
 
-  const { data: school } = await supabase
-    .from('schools')
-    .select(`
-      *,
-      school_contacts (*),
-      contracts (
-        *,
-        visits (id, status)
-      )
-    `)
-    .eq('id', id)
-    .single()
+  const [{ data: school }, { data: recentVisits }] = await Promise.all([
+    supabase
+      .from('schools')
+      .select(`*, school_contacts (*), contracts (*, visits (id, status))`)
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('visits')
+      .select('id, visit_date, slot, visit_type, status, notes, technicians (full_name)')
+      .eq('school_id', id)
+      .not('visit_type', 'in', '("annual_leave","sickness","other_absence")')
+      .order('visit_date', { ascending: false })
+      .limit(20),
+  ])
 
   if (!school) notFound()
 
@@ -29,7 +39,6 @@ export default async function SchoolProfilePage({
     (c: { status: string }) => c.status === 'active'
   )
 
-  // Visit stats from active contract
   const activeVisits   = activeContract?.visits ?? []
   const completedCount = activeVisits.filter((v: { status: string }) => v.status === 'completed').length
   const bankedCount    = activeVisits.filter((v: { status: string }) => v.status === 'banked').length
@@ -46,33 +55,24 @@ export default async function SchoolProfilePage({
             ← Schools
           </Link>
           <span className="text-gray-200">/</span>
-<div className="flex items-center gap-3">
-  {school.photo_url ? (
-    <img
-      src={school.photo_url}
-      alt={school.name}
-      className="w-9 h-9 rounded-lg object-cover border border-gray-100"
-    />
-  ) : (
-    <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
-      style={{ background: '#8B3A2A' }}>
-      {(school.short_name || school.name).slice(0, 2).toUpperCase()}
-    </div>
-  )}
-  <h1 className="text-xl font-semibold text-gray-900">{school.name}</h1>
-</div>
+          {school.photo_url ? (
+            <img src={school.photo_url} alt={school.name}
+              className="w-9 h-9 rounded-lg object-cover border border-gray-100" />
+          ) : (
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-semibold shrink-0"
+              style={{ background: '#46DA26' }}>
+              {(school.short_name || school.name).slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <h1 className="text-xl font-semibold text-gray-900">{school.name}</h1>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            school.is_active
-              ? 'bg-green-50 text-green-700'
-              : 'bg-gray-100 text-gray-500'
+            school.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
           }`}>
             {school.is_active ? 'Active' : 'Inactive'}
           </span>
         </div>
-        <Link
-          href={`/admin/schools/${id}/edit`}
-          className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50"
-        >
+        <Link href={`/admin/schools/${id}/edit`}
+          className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
           Edit
         </Link>
       </div>
@@ -82,7 +82,7 @@ export default async function SchoolProfilePage({
         {/* Left column */}
         <div className="col-span-2 space-y-4">
 
-          {/* School details */}
+          {/* Details */}
           <div className="bg-white rounded-xl border border-gray-100 p-5">
             <h2 className="text-sm font-semibold text-gray-700 mb-4">Details</h2>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
@@ -99,15 +99,8 @@ export default async function SchoolProfilePage({
               <div>
                 <dt className="text-gray-400">Address</dt>
                 <dd className="text-gray-900 mt-0.5 leading-relaxed">
-                  {[
-                    school.address_line_1,
-                    school.address_line_2,
-                    school.town,
-                    school.county,
-                    school.postcode,
-                  ]
-                    .filter(Boolean)
-                    .join(', ') || '—'}
+                  {[school.address_line_1, school.address_line_2, school.town, school.county, school.postcode]
+                    .filter(Boolean).join(', ') || '—'}
                 </dd>
               </div>
               <div>
@@ -129,18 +122,14 @@ export default async function SchoolProfilePage({
               <h2 className="text-sm font-semibold text-gray-700">Contracts</h2>
               <div className="flex items-center gap-3">
                 {activeContract && (
-                  <Link
-                    href={`/admin/schools/${id}/schedule/generate`}
+                  <Link href={`/admin/schools/${id}/schedule/generate`}
                     className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
-                    style={{ background: '#8B3A2A' }}
-                  >
+                    style={{ background: '#46DA26' }}>
                     Generate schedule
                   </Link>
                 )}
-                <Link
-                  href={`/admin/schools/${id}/contracts/new`}
-                  className="text-xs text-gray-400 hover:text-gray-700"
-                >
+                <Link href={`/admin/schools/${id}/contracts/new`}
+                  className="text-xs text-gray-400 hover:text-gray-700">
                   + Add contract
                 </Link>
               </div>
@@ -153,23 +142,16 @@ export default async function SchoolProfilePage({
                     new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
                   )
                   .map((contract: {
-                    id: string
-                    start_date: string
-                    end_date: string
-                    frequency: string
-                    visit_duration: string
-                    status: string
+                    id: string; start_date: string; end_date: string
+                    frequency: string; visit_duration: string; status: string
                     visits: { id: string; status: string }[]
                   }) => {
                     const cCompleted = contract.visits?.filter(v => v.status === 'completed').length ?? 0
                     const cTotal     = contract.visits?.length ?? 0
                     const isActive   = contract.status === 'active'
-
                     return (
                       <div key={contract.id}
-                        className={`p-3 rounded-lg border text-sm ${
-                          isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-75'
-                        }`}>
+                        className={`p-3 rounded-lg border text-sm ${isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-75'}`}>
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="font-medium text-gray-900">
                             {new Date(contract.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -177,25 +159,16 @@ export default async function SchoolProfilePage({
                             {new Date(contract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            isActive
-                              ? 'bg-green-50 text-green-700'
-                              : contract.status === 'expired'
-                              ? 'bg-gray-100 text-gray-500'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}>
-                            {contract.status}
-                          </span>
+                            isActive ? 'bg-green-50 text-green-700' :
+                            contract.status === 'expired' ? 'bg-gray-100 text-gray-500' :
+                            'bg-amber-50 text-amber-700'
+                          }`}>{contract.status}</span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-gray-500">
                           <span className="capitalize">{contract.frequency.replace('_', ' ')}</span>
                           <span>·</span>
                           <span>{contract.visit_duration === 'half_day' ? 'Half day' : 'Full day'}</span>
-                          {cTotal > 0 && (
-                            <>
-                              <span>·</span>
-                              <span>{cCompleted}/{cTotal} visits completed</span>
-                            </>
-                          )}
+                          {cTotal > 0 && <><span>·</span><span>{cCompleted}/{cTotal} visits completed</span></>}
                         </div>
                       </div>
                     )
@@ -204,14 +177,58 @@ export default async function SchoolProfilePage({
             ) : (
               <div className="text-center py-6">
                 <p className="text-sm text-gray-400 mb-3">No contracts yet</p>
-                <Link
-                  href={`/admin/schools/${id}/contracts/new`}
+                <Link href={`/admin/schools/${id}/contracts/new`}
                   className="inline-flex px-4 py-2 rounded-lg text-sm font-medium text-white"
-                  style={{ background: '#8B3A2A' }}
-                >
+                  style={{ background: '#46DA26' }}>
                   Add contract
                 </Link>
               </div>
+            )}
+          </div>
+
+          {/* Visit history */}
+          <div className="bg-white rounded-xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-gray-700">Visit history</h2>
+              <Link href="/admin/reports" className="text-xs text-gray-400 hover:text-gray-700">
+                Full report →
+              </Link>
+            </div>
+
+            {recentVisits && recentVisits.length > 0 ? (
+              <div className="divide-y divide-gray-50">
+                {recentVisits.map((v: {
+                  id: string; visit_date: string; slot: string; visit_type: string
+                  status: string; notes: string | null
+                  technicians: { full_name: string } | null
+                }) => (
+                  <div key={v.id} className="flex items-center gap-3 py-2 text-xs">
+                    <span className="text-gray-500 w-24 shrink-0">
+                      {new Date(v.visit_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                    <span className={`px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                      v.slot === 'am' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
+                    }`}>
+                      {v.slot.toUpperCase()}
+                    </span>
+                    <span className="text-gray-600 flex-1 truncate">
+                      {VISIT_TYPE_LABELS[v.visit_type] ?? v.visit_type}
+                      {v.technicians?.full_name && ` · ${v.technicians.full_name.split(' ')[0]}`}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${
+                      v.status === 'completed' ? 'bg-green-50 text-green-700' :
+                      v.status === 'confirmed' ? 'bg-blue-50 text-blue-700' :
+                      v.status === 'banked'    ? 'bg-purple-50 text-purple-700' :
+                      v.status === 'disrupted' ? 'bg-red-50 text-red-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {v.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-4">No visits yet</p>
             )}
           </div>
 
@@ -224,39 +241,30 @@ export default async function SchoolProfilePage({
           <div className="bg-white rounded-xl border border-gray-100 p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-gray-700">Contacts</h2>
-              <Link
-                href={`/admin/schools/${id}/contacts/new`}
-                className="text-xs text-gray-400 hover:text-gray-700"
-              >
+              <Link href={`/admin/schools/${id}/contacts/new`}
+                className="text-xs text-gray-400 hover:text-gray-700">
                 + Add
               </Link>
             </div>
-
             {school.school_contacts?.length > 0 ? (
               <div className="space-y-3">
                 {school.school_contacts.map((contact: {
-                  id: string
-                  full_name: string
-                  role_title: string | null
-                  email: string
-                  notify_visits: boolean
-                  is_primary: boolean
+                  id: string; full_name: string; role_title: string | null
+                  email: string; notify_visits: boolean; is_primary: boolean
                 }) => (
                   <div key={contact.id} className="text-sm">
-<div className="flex items-center justify-between gap-2">
-  <div className="flex items-center gap-2">
-    <span className="font-medium text-gray-900">{contact.full_name}</span>
-    {contact.is_primary && (
-      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Primary</span>
-    )}
-  </div>
-  <Link
-    href={`/admin/schools/${id}/contacts/${contact.id}/edit`}
-    className="text-xs text-gray-400 hover:text-gray-700 shrink-0"
-  >
-    Edit
-  </Link>
-</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{contact.full_name}</span>
+                        {contact.is_primary && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Primary</span>
+                        )}
+                      </div>
+                      <Link href={`/admin/schools/${id}/contacts/${contact.id}/edit`}
+                        className="text-xs text-gray-400 hover:text-gray-700 shrink-0">
+                        Edit
+                      </Link>
+                    </div>
                     {contact.role_title && (
                       <p className="text-gray-400 text-xs mt-0.5">{contact.role_title}</p>
                     )}
