@@ -30,16 +30,30 @@ function addWorkingDays(date: Date, days: number): Date {
   return d
 }
 
+function visitsPerCycle(frequency: string, customPerYear: number | null): number {
+  // How many visits per 6-week rota cycle
+  switch (frequency) {
+    case 'weekly':       return 6
+    case 'fortnightly':  return 3
+    case 'three_weekly': return 2
+    case 'monthly':      return 1.5
+    case 'half_termly':  return 1
+    case 'termly':       return 0.5
+    case 'custom':       return customPerYear ? customPerYear / 6 : 0
+    default:             return 0
+  }
+}
+
 // ── Delivery Report ────────────────────────────────────────────────────────────
 
 interface DeliveryRow {
   school_id: string
   school_name: string
   frequency: string
-  contracted: number
+  expected: number
+  scheduled: number
   completed: number
   banked: number
-  remaining: number
   pct: number
 }
 
@@ -51,36 +65,73 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data: contracts } = await supabase
-        .from('contracts')
-        .select('id, school_id, frequency, custom_visits_per_year, schools (id, name, short_name)')
-        .eq('status', 'active')
-
-      const { data: visits } = await supabase
-        .from('visits')
-        .select('school_id, status')
-        .eq('visit_type', 'technology_partner')
-        .gte('visit_date', start)
-        .lte('visit_date', end)
+      const [
+        { data: contracts },
+        { data: visits },
+        { data: rotaWeeks },
+        { data: termDates },
+      ] = await Promise.all([
+        supabase.from('contracts')
+          .select('id, school_id, frequency, custom_visits_per_year, start_date, end_date, schools (id, name, short_name)')
+          .eq('status', 'active'),
+        supabase.from('visits')
+          .select('school_id, status')
+          .eq('visit_type', 'technology_partner')
+          .gte('visit_date', start)
+          .lte('visit_date', end),
+        supabase.from('rota_calendar')
+          .select('week_start')
+          .gte('week_start', start)
+          .lte('week_start', end),
+        supabase.from('term_dates')
+          .select('start_date, end_date')
+          .order('start_date'),
+      ])
 
       const result: DeliveryRow[] = (contracts ?? []).map((c: {
         id: string; school_id: string; frequency: string; custom_visits_per_year: number | null
+        start_date: string; end_date: string
         schools: { id: string; name: string; short_name: string | null } | null
       }) => {
         const schoolVisits = (visits ?? []).filter((v: { school_id: string }) => v.school_id === c.school_id)
         const completed    = schoolVisits.filter((v: { status: string }) => v.status === 'completed').length
         const banked       = schoolVisits.filter((v: { status: string }) => v.status === 'banked').length
-        const total        = schoolVisits.length
-        const remaining    = total - completed - banked
-        const pct          = total > 0 ? Math.round((completed / total) * 100) : 0
+        const scheduled    = schoolVisits.length
+
+        // Overlap between contract period and selected date range
+        const contractStart = c.start_date > start ? c.start_date : start
+        const contractEnd   = c.end_date   < end   ? c.end_date   : end
+
+        // Count rota weeks in overlap for cycle-based frequencies
+        const overlapWeeks  = (rotaWeeks ?? []).filter((r: { week_start: string }) =>
+          r.week_start >= contractStart && r.week_start <= contractEnd
+        ).length
+        const overlapCycles = overlapWeeks / 6
+
+        // Count half-terms in overlap for term-based frequencies
+        const overlapTerms  = (termDates ?? []).filter((t: { start_date: string; end_date: string }) =>
+          t.start_date >= contractStart && t.end_date <= contractEnd
+        ).length
+
+        let expected: number
+        if (c.frequency === 'half_termly') {
+          expected = overlapTerms
+        } else if (c.frequency === 'termly') {
+          expected = Math.round(overlapTerms / 2)
+        } else {
+          expected = Math.round(visitsPerCycle(c.frequency, c.custom_visits_per_year) * overlapCycles)
+        }
+
+        const pct = expected > 0 ? Math.round((completed / expected) * 100) : 0
+
         return {
           school_id:   c.school_id,
           school_name: c.schools?.name ?? 'Unknown',
           frequency:   c.frequency.replace('_', ' '),
-          contracted:  total,
+          expected,
+          scheduled,
           completed,
           banked,
-          remaining,
           pct,
         }
       }).sort((a, b) => a.school_name.localeCompare(b.school_name))
@@ -93,8 +144,8 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
 
   function exportCsv() {
     csvDownload('delivery-report.csv', [
-      ['School', 'Frequency', 'Total Scheduled', 'Completed', 'Banked', 'Remaining', '% Complete'],
-      ...rows.map(r => [r.school_name, r.frequency, r.contracted, r.completed, r.banked, r.remaining, `${r.pct}%`].map(String))
+      ['School', 'Frequency', 'Expected', 'Scheduled', 'Completed', 'Banked', '% Complete'],
+      ...rows.map(r => [r.school_name, r.frequency, r.expected, r.scheduled, r.completed, r.banked, `${r.pct}%`].map(String))
     ])
   }
 
@@ -112,10 +163,10 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
             <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500">
               <th className="text-left px-4 py-3">School</th>
               <th className="text-left px-4 py-3">Frequency</th>
+              <th className="text-right px-4 py-3">Expected</th>
               <th className="text-right px-4 py-3">Scheduled</th>
               <th className="text-right px-4 py-3">Completed</th>
               <th className="text-right px-4 py-3">Banked</th>
-              <th className="text-right px-4 py-3">Remaining</th>
               <th className="px-4 py-3 w-32">Progress</th>
             </tr>
           </thead>
@@ -126,10 +177,10 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
                   <Link href={`/admin/schools/${r.school_id}`} className="font-medium text-gray-900 hover:text-gray-600">{r.school_name}</Link>
                 </td>
                 <td className="px-4 py-2.5 text-gray-500 capitalize">{r.frequency}</td>
-                <td className="px-4 py-2.5 text-right text-gray-700">{r.contracted}</td>
+                <td className="px-4 py-2.5 text-right text-gray-700">{r.expected}</td>
+                <td className="px-4 py-2.5 text-right text-gray-500">{r.scheduled}</td>
                 <td className="px-4 py-2.5 text-right text-green-700 font-medium">{r.completed}</td>
                 <td className="px-4 py-2.5 text-right text-purple-700">{r.banked}</td>
-                <td className="px-4 py-2.5 text-right text-gray-500">{r.remaining}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-gray-100 rounded-full h-1.5">
@@ -654,6 +705,51 @@ export default function ReportsPage() {
   const defaults          = getDefaultRange()
   const [start, setStart] = useState(defaults.start)
   const [end, setEnd]     = useState(defaults.end)
+  const [terms, setTerms] = useState<{ term_name: string; start_date: string; end_date: string }[]>([])
+
+  useEffect(() => {
+    createClient().from('term_dates').select('term_name, start_date, end_date').order('start_date')
+      .then(({ data }) => setTerms(data ?? []))
+  }, [])
+
+  function applyPreset(preset: string) {
+    const today = new Date()
+    const todayStr = toDateStr(today)
+
+    if (preset === 'academy_year') {
+      const y = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1
+      setStart(`${y}-09-01`); setEnd(`${y+1}-07-31`); return
+    }
+    if (preset === 'la_year') {
+      const y = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1
+      setStart(`${y}-04-01`); setEnd(`${y+1}-03-31`); return
+    }
+    if (preset === 'calendar_year') {
+      setStart(`${today.getFullYear()}-01-01`); setEnd(`${today.getFullYear()}-12-31`); return
+    }
+
+    // Half-term presets — need term_dates
+    if (terms.length === 0) return
+
+    // Find which term today falls in, or the nearest upcoming one
+    const currentTerm = terms.find(t => todayStr >= t.start_date && todayStr <= t.end_date)
+    const currentIdx  = currentTerm ? terms.indexOf(currentTerm) : terms.findIndex(t => t.start_date > todayStr)
+
+    if (preset === 'current_halfterm') {
+      const t = currentTerm ?? terms[currentIdx]
+      if (t) { setStart(t.start_date); setEnd(t.end_date) }
+    }
+    if (preset === 'last_halfterm') {
+      const idx = currentTerm ? terms.indexOf(currentTerm) - 1 : currentIdx - 1
+      const t   = terms[idx]
+      if (t) { setStart(t.start_date); setEnd(t.end_date) }
+    }
+    if (preset === 'next_halfterm') {
+      const idx = currentTerm ? terms.indexOf(currentTerm) + 1 : currentIdx
+      const t   = terms[idx]
+      if (t) { setStart(t.start_date); setEnd(t.end_date) }
+    }
+  }
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'delivery',     label: 'Visits delivered' },
@@ -690,6 +786,25 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* Presets */}
+      {!hideDateRange && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-4">
+          <span className="text-xs text-gray-400 mr-1">Quick:</span>
+          {[
+            { key: 'current_halfterm', label: 'This half term' },
+            { key: 'last_halfterm',    label: 'Last half term' },
+            { key: 'next_halfterm',    label: 'Next half term' },
+            { key: 'academy_year',     label: 'Academy year' },
+            { key: 'la_year',          label: 'LA year' },
+          ].map(p => (
+            <button key={p.key} onClick={() => applyPreset(p.key)}
+              className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors">
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-5 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
