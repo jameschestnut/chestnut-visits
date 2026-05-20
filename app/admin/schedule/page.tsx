@@ -194,15 +194,16 @@ export default function WeeklyPlannerPage() {
   function onSidebarDragOver(e: React.DragEvent) { e.preventDefault(); setOverSidebar(true); setOverSlot(null) }
 
   function onSidebarDrop(e: React.DragEvent) {
-    e.preventDefault(); setOverSidebar(false)
-    if (!drag.current || drag.current.source !== 'grid' || !drag.current.visitId) return
-    const visit = visits.find(v => v.id === drag.current!.visitId)
-    if (!visit || getVisitTypeConfig(visit.visit_type).isAbsence) return
-    setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: visit.schools?.short_name || visit.schools?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot }])
-    setVisits(prev => prev.filter(v => v.id !== drag.current!.visitId))
-    setPending(prev => [...prev, { label: `${visit.schools?.short_name || visit.schools?.name}: banked`, visitId: visit.id, action: 'bank' }])
-    drag.current = null
-  }
+  e.preventDefault(); setOverSidebar(false)
+  if (!drag.current || drag.current.source !== 'grid' || !drag.current.visitId) return
+  const visitId = drag.current.visitId
+  drag.current = null
+  const visit = visits.find(v => v.id === visitId)
+  if (!visit || getVisitTypeConfig(visit.visit_type).isAbsence) return
+  setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: visit.schools?.short_name || visit.schools?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot }])
+  setVisits(prev => prev.filter(v => v.id !== visitId))
+  setPending(prev => [...prev, { label: `${visit.schools?.short_name || visit.schools?.name}: banked`, visitId: visit.id, action: 'bank' }])
+}
 
   function openPopover(techId: string, techName: string, dateStr: string, slot: string) {
     setPopover({ techId, techName, dateStr, slot })

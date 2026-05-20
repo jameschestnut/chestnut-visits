@@ -34,7 +34,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    label: 'Schedule',
+    label: 'Planner',
     href: '/admin/schedule',
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
