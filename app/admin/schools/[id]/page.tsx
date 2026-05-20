@@ -153,17 +153,23 @@ export default async function SchoolProfilePage({
                       <div key={contract.id}
                         className={`p-3 rounded-lg border text-sm ${isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-75'}`}>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-medium text-gray-900">
-                            {new Date(contract.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            {' – '}
-                            {new Date(contract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            isActive ? 'bg-green-50 text-green-700' :
-                            contract.status === 'expired' ? 'bg-gray-100 text-gray-500' :
-                            'bg-amber-50 text-amber-700'
-                          }`}>{contract.status}</span>
-                        </div>
+  <span className="font-medium text-gray-900">
+    {new Date(contract.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+    {' – '}
+    {new Date(contract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+  </span>
+  <div className="flex items-center gap-2">
+    <Link href={`/admin/schools/${id}/contracts/${contract.id}/edit`}
+      className="text-xs text-gray-400 hover:text-gray-700">
+      Edit
+    </Link>
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+      isActive ? 'bg-green-50 text-green-700' :
+      contract.status === 'expired' ? 'bg-gray-100 text-gray-500' :
+      'bg-amber-50 text-amber-700'
+    }`}>{contract.status}</span>
+  </div>
+</div>
                         <div className="flex items-center gap-3 text-xs text-gray-500">
                           <span className="capitalize">{contract.frequency.replace('_', ' ')}</span>
                           <span>·</span>
