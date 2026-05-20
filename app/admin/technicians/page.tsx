@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 
@@ -16,8 +17,10 @@ interface Technician {
 
 export default function TechniciansPage() {
   const supabase = createClient()
-  const [technicians, setTechnicians] = useState<Technician[]>([])
-  const [loading, setLoading]         = useState(true)
+  const router   = useRouter()
+
+  const [technicians, setTechnicians]   = useState<Technician[]>([])
+  const [loading, setLoading]           = useState(true)
   const [hideInactive, setHideInactive] = useState(true)
 
   useEffect(() => {
@@ -33,10 +36,7 @@ export default function TechniciansPage() {
     load()
   }, [])
 
-  const filtered = hideInactive
-    ? technicians.filter(t => t.is_active)
-    : technicians
-
+  const filtered      = hideInactive ? technicians.filter(t => t.is_active) : technicians
   const activeCount   = technicians.filter(t => t.is_active).length
   const inactiveCount = technicians.filter(t => !t.is_active).length
 
@@ -50,7 +50,6 @@ export default function TechniciansPage() {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Technicians</h1>
@@ -90,13 +89,15 @@ export default function TechniciansPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Role</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(tech => (
-                <tr key={tech.id}
-                  className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors">
+                <tr
+                  key={tech.id}
+                  onClick={() => router.push(`/admin/technicians/${tech.id}`)}
+                  className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {tech.photo_url ? (
@@ -117,18 +118,10 @@ export default function TechniciansPage() {
                   <td className="px-4 py-3 text-gray-600">{tech.email}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      tech.is_active
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
+                      tech.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {tech.is_active ? 'Active' : 'Inactive'}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/admin/technicians/${tech.id}`}
-                      className="text-xs text-gray-400 hover:text-gray-700">
-                      View →
-                    </Link>
                   </td>
                 </tr>
               ))}
