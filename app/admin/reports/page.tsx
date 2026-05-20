@@ -218,19 +218,28 @@ function UtilisationReport({ start, end }: { start: string; end: string }) {
     async function load() {
       setLoading(true)
 
-      // Count working days in range
-      let workingDays = 0
-      let d = new Date(start + 'T12:00:00')
-      const endDate = new Date(end + 'T12:00:00')
-      while (d <= endDate) { if (d.getDay()!==0&&d.getDay()!==6) workingDays++; d.setDate(d.getDate()+1) }
-      const totalSlots = workingDays * 2 // AM + PM
 
-      const [{ data: techs }, { data: visits }] = await Promise.all([
-        supabase.from('technicians').select('id, full_name').eq('is_active', true).order('full_name'),
-        supabase.from('visits').select('technician_id, visit_type, status')
-          .gte('visit_date', start).lte('visit_date', end)
-          .not('status', 'in', '("banked")'),
-      ])
+const [{ data: techs }, { data: visits }, { data: holidays }] = await Promise.all([
+  
+  supabase.from('technicians').select('id, full_name').eq('is_active', true).order('full_name'),
+  supabase.from('visits').select('technician_id, visit_type, status')
+    .gte('visit_date', start).lte('visit_date', end)
+    .not('status', 'in', '("banked")'),
+  supabase.from('bank_holidays').select('holiday_date')
+    .gte('holiday_date', start)
+    .lte('holiday_date', end),
+])
+
+const holidaySet = new Set((holidays ?? []).map((h: { holiday_date: string }) => h.holiday_date))
+let workingDays = 0
+let d = new Date(start + 'T12:00:00')
+const endDate = new Date(end + 'T12:00:00')
+while (d <= endDate) {
+  const ds = toDateStr(d)
+  if (d.getDay() !== 0 && d.getDay() !== 6 && !holidaySet.has(ds)) workingDays++
+  d.setDate(d.getDate() + 1)
+}
+const totalSlots = workingDays * 2
 
       const ABSENCE_TYPES = new Set(['annual_leave', 'sickness', 'other_absence'])
 
