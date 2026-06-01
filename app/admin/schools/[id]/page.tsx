@@ -35,8 +35,10 @@ export default async function SchoolProfilePage({
 
   if (!school) notFound()
 
+  const today = new Date().toISOString().split('T')[0]
   const activeContract = school.contracts?.find(
-    (c: { status: string }) => c.status === 'active'
+    (c: { status: string; start_date: string; end_date: string }) =>
+      c.status === 'active' && c.start_date <= today && c.end_date >= today
   )
 
   const activeVisits   = activeContract?.visits ?? []
@@ -148,7 +150,7 @@ export default async function SchoolProfilePage({
                   }) => {
                     const cCompleted = contract.visits?.filter(v => v.status === 'completed').length ?? 0
                     const cTotal     = contract.visits?.length ?? 0
-                    const isActive   = contract.status === 'active'
+                    const isActive   = contract.status === 'active' && contract.start_date <= today && contract.end_date >= today
                     return (
                       <div key={contract.id}
                         className={`p-3 rounded-lg border text-sm ${isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-75'}`}>
