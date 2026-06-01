@@ -6,13 +6,16 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 
 const FREQUENCY_OPTIONS = [
-  { value: 'weekly',       label: 'Weekly',        description: '38 visits/year' },
-  { value: 'fortnightly',  label: 'Fortnightly',   description: '19 visits/year' },
-  { value: 'three_weekly', label: 'Every 3 weeks', description: '~13 visits/year' },
-  { value: 'monthly',      label: 'Monthly',       description: '12 visits/year' },
-  { value: 'half_termly',  label: 'Half-termly',   description: '6 visits/year' },
-  { value: 'termly',       label: 'Termly',        description: '3 visits/year' },
-  { value: 'custom',       label: 'Custom',        description: 'Set manually' },
+  { value: 'weekly',                  label: 'Weekly',        description: '38 visits/year' },
+  { value: 'one_point_five_weekly',   label: '1.5x Weekly',   description: '57 visits/year' },
+  { value: 'twice_weekly',            label: '2x Weekly',     description: '76 visits/year' },
+  { value: 'three_times_weekly',      label: '3x Weekly',     description: '114 visits/year' },
+  { value: 'fortnightly',             label: 'Fortnightly',   description: '19 visits/year' },
+  { value: 'three_weekly',            label: 'Every 3 weeks', description: '~13 visits/year' },
+  { value: 'monthly',                 label: 'Monthly',       description: '12 visits/year' },
+  { value: 'half_termly',             label: 'Half-termly',   description: '6 visits/year' },
+  { value: 'termly',                  label: 'Termly',        description: '3 visits/year' },
+  { value: 'custom',                  label: 'Custom',        description: 'Set manually' },
 ]
 
 const DURATION_OPTIONS = [
@@ -56,14 +59,17 @@ export default function NewContractPage() {
   function expectedVisits(): string {
     const weeks = 38
     switch (form.frequency) {
-      case 'weekly':       return '38'
-      case 'fortnightly':  return '19'
-      case 'three_weekly': return '~13'
-      case 'monthly':      return '12'
-      case 'half_termly':  return '6'
-      case 'termly':       return '3'
-      case 'custom':       return form.custom_visits_per_year || '—'
-      default:             return '—'
+      case 'weekly':                  return '38'
+      case 'one_point_five_weekly':   return '57'
+      case 'twice_weekly':            return '76'
+      case 'three_times_weekly':      return '114'
+      case 'fortnightly':             return '19'
+      case 'three_weekly':            return '~13'
+      case 'monthly':                 return '12'
+      case 'half_termly':             return '6'
+      case 'termly':                  return '3'
+      case 'custom':                  return form.custom_visits_per_year || '—'
+      default:                        return '—'
     }
   }
 

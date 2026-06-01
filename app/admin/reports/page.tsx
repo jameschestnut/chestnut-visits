@@ -33,14 +33,17 @@ function addWorkingDays(date: Date, days: number): Date {
 function visitsPerCycle(frequency: string, customPerYear: number | null): number {
   // How many visits per 6-week rota cycle
   switch (frequency) {
-    case 'weekly':       return 6
-    case 'fortnightly':  return 3
-    case 'three_weekly': return 2
-    case 'monthly':      return 1.5
-    case 'half_termly':  return 1
-    case 'termly':       return 0.5
-    case 'custom':       return customPerYear ? customPerYear / 6 : 0
-    default:             return 0
+    case 'weekly':                return 6
+    case 'one_point_five_weekly': return 9
+    case 'twice_weekly':          return 12
+    case 'three_times_weekly':    return 18
+    case 'fortnightly':           return 3
+    case 'three_weekly':          return 2
+    case 'monthly':               return 1.5
+    case 'half_termly':           return 1
+    case 'termly':                return 0.5
+    case 'custom':                return customPerYear ? customPerYear / 6 : 0
+    default:                      return 0
   }
 }
 
@@ -88,19 +91,22 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
           .order('start_date'),
       ])
 
-      const result: DeliveryRow[] = (contracts ?? []).map((c: {
+      const result: DeliveryRow[] = ((contracts ?? []).map((c: {
         id: string; school_id: string; frequency: string; custom_visits_per_year: number | null
         start_date: string; end_date: string
         schools: { id: string; name: string; short_name: string | null } | null
       }) => {
+        // Overlap between contract period and selected date range
+        const contractStart = c.start_date > start ? c.start_date : start
+        const contractEnd   = c.end_date   < end   ? c.end_date   : end
+
+        // Skip contracts with no overlap in the selected period
+        if (contractStart > contractEnd) return null
+
         const schoolVisits = (visits ?? []).filter((v: { school_id: string }) => v.school_id === c.school_id)
         const completed    = schoolVisits.filter((v: { status: string }) => v.status === 'completed').length
         const banked       = schoolVisits.filter((v: { status: string }) => v.status === 'banked').length
         const scheduled    = schoolVisits.length
-
-        // Overlap between contract period and selected date range
-        const contractStart = c.start_date > start ? c.start_date : start
-        const contractEnd   = c.end_date   < end   ? c.end_date   : end
 
         // Count rota weeks in overlap for cycle-based frequencies
         const overlapWeeks  = (rotaWeeks ?? []).filter((r: { week_start: string }) =>
@@ -134,7 +140,7 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
           banked,
           pct,
         }
-      }).sort((a, b) => a.school_name.localeCompare(b.school_name))
+      }).filter(Boolean) as DeliveryRow[]).sort((a, b) => a.school_name.localeCompare(b.school_name))
 
       setRows(result)
       setLoading(false)
@@ -184,7 +190,7 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                      <div className="h-1.5 rounded-full" style={{ width: `${r.pct}%`, background: r.pct >= 80 ? '#46DA26' : r.pct >= 50 ? '#f59e0b' : '#ef4444' }} />
+                      <div className="h-1.5 rounded-full" style={{ width: `${Math.min(r.pct, 100)}%`, background: r.pct >= 80 ? '#46DA26' : r.pct >= 50 ? '#f59e0b' : '#ef4444' }} />
                     </div>
                     <span className="text-xs text-gray-500 w-8 text-right">{r.pct}%</span>
                   </div>
@@ -530,6 +536,7 @@ const VISIT_TYPE_LABELS: Record<string, string> = {
   shadow:             'Shadow',
   installation:       'Installation',
   phone_duty:         'Phone duty',
+  other_visit:        'Other visit',
   annual_leave:       'Annual leave',
   sickness:           'Sickness',
   other_absence:      'Other absence',

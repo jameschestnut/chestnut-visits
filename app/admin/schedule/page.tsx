@@ -18,6 +18,7 @@ const VISIT_TYPES: {
   { value: 'shadow',             label: 'Shadow',        colour: '#3D6B5E', needsSchool: true,  isAbsence: false },
   { value: 'installation',       label: 'Installation',  colour: '#1D6FA4', needsSchool: true,  isAbsence: false },
   { value: 'phone_duty',         label: 'Phone duty',    colour: '#1A6FA8', needsSchool: false, isAbsence: false },
+  { value: 'other_visit',        label: 'Other visit',   colour: '#6B6B6B', needsSchool: false, isAbsence: false },
   { value: 'annual_leave',       label: 'Annual leave',  colour: '#94a3b8', needsSchool: false, isAbsence: true  },
   { value: 'sickness',           label: 'Sickness',      colour: '#ef4444', needsSchool: false, isAbsence: true  },
   { value: 'other_absence',      label: 'Other absence', colour: '#a78bfa', needsSchool: false, isAbsence: true  },
