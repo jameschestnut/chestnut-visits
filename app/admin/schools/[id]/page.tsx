@@ -151,6 +151,10 @@ export default async function SchoolProfilePage({
                     const cCompleted = contract.visits?.filter(v => v.status === 'completed').length ?? 0
                     const cTotal     = contract.visits?.length ?? 0
                     const isActive   = contract.status === 'active' && contract.start_date <= today && contract.end_date >= today
+                    const displayStatus = contract.status === 'cancelled' ? 'cancelled'
+                      : contract.end_date < today   ? 'expired'
+                      : contract.start_date > today ? 'future'
+                      : 'active'
                     return (
                       <div key={contract.id}
                         className={`p-3 rounded-lg border text-sm ${isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-75'}`}>
@@ -166,10 +170,11 @@ export default async function SchoolProfilePage({
       Edit
     </Link>
     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-      isActive ? 'bg-green-50 text-green-700' :
-      contract.status === 'expired' ? 'bg-gray-100 text-gray-500' :
-      'bg-amber-50 text-amber-700'
-    }`}>{contract.status}</span>
+      displayStatus === 'active'    ? 'bg-green-50 text-green-700' :
+      displayStatus === 'future'    ? 'bg-blue-50 text-blue-700' :
+      displayStatus === 'cancelled' ? 'bg-amber-50 text-amber-700' :
+      'bg-gray-100 text-gray-500'
+    }`}>{displayStatus}</span>
   </div>
 </div>
                         <div className="flex items-center gap-3 text-xs text-gray-500">
