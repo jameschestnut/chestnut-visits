@@ -50,6 +50,7 @@ function visitsPerCycle(frequency: string, customPerYear: number | null): number
 // ── Delivery Report ────────────────────────────────────────────────────────────
 
 interface DeliveryRow {
+  contract_id: string
   school_id: string
   school_name: string
   frequency: string
@@ -131,6 +132,7 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
         const pct = expected > 0 ? Math.round((completed / expected) * 100) : 0
 
         return {
+          contract_id: c.id,
           school_id:   c.school_id,
           school_name: c.schools?.name ?? 'Unknown',
           frequency:   c.frequency.replace('_', ' '),
@@ -178,7 +180,7 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.school_id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50">
+              <tr key={r.contract_id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50">
                 <td className="px-4 py-2.5">
                   <Link href={`/admin/schools/${r.school_id}`} className="font-medium text-gray-900 hover:text-gray-600">{r.school_name}</Link>
                 </td>
