@@ -77,7 +77,9 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
       ] = await Promise.all([
         supabase.from('contracts')
           .select('id, school_id, frequency, custom_visits_per_year, start_date, end_date, schools (id, name, short_name)')
-          .eq('status', 'active'),
+          .eq('status', 'active')
+          .lte('start_date', toDateStr(new Date()))
+          .gte('end_date', toDateStr(new Date())),
         supabase.from('visits')
           .select('school_id, status')
           .eq('visit_type', 'technology_partner')
