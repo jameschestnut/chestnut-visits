@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 
+interface Contract {
+  status: string
+  start_date: string
+  end_date: string
+}
+
 interface School {
   id: string
   name: string
@@ -12,6 +18,7 @@ interface School {
   is_active: boolean
   photo_url: string | null
   town: string | null
+  contracts: Contract[]
 }
 
 export default function SchoolsPage() {
@@ -29,7 +36,7 @@ export default function SchoolsPage() {
     async function load() {
       const { data } = await supabase
         .from('schools')
-        .select('id, name, short_name, is_active, photo_url, town')
+        .select('id, name, short_name, is_active, photo_url, town, contracts (status, start_date, end_date)')
         .order('name')
       setSchools(data ?? [])
       setLoading(false)
@@ -37,8 +44,13 @@ export default function SchoolsPage() {
     load()
   }, [])
 
-  const activeCount   = schools.filter(s => s.is_active).length
-  const inactiveCount = schools.filter(s => !s.is_active).length
+  const today = new Date().toISOString().split('T')[0]
+  function hasActiveContract(s: School) {
+    return s.contracts?.some(c => c.status === 'active' && c.start_date <= today && c.end_date >= today) ?? false
+  }
+
+  const activeCount   = schools.filter(s => hasActiveContract(s)).length
+  const inactiveCount = schools.filter(s => !hasActiveContract(s)).length
 
   function toggleSort(col: 'name' | 'town') {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -46,7 +58,7 @@ export default function SchoolsPage() {
   }
 
   const filtered = schools
-    .filter(s => hideInactive ? s.is_active : true)
+    .filter(s => hideInactive ? hasActiveContract(s) : true)
     .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.short_name?.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const av = (a[sortCol] ?? '').toLowerCase()
@@ -125,7 +137,7 @@ export default function SchoolsPage() {
                         </div>
                       )}
                       <div>
-                        <div className={`font-medium ${school.is_active ? 'text-gray-900' : 'text-gray-400'}`}>
+                        <div className={`font-medium ${hasActiveContract(school) ? 'text-gray-900' : 'text-gray-400'}`}>
                           {school.name}
                         </div>
                         {school.short_name && (
@@ -137,9 +149,9 @@ export default function SchoolsPage() {
                   <td className="px-4 py-3 text-gray-500">{school.town ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      school.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                      hasActiveContract(school) ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
                     }`}>
-                      {school.is_active ? 'Active' : 'Inactive'}
+                      {hasActiveContract(school) ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                 </tr>
