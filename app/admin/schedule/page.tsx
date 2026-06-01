@@ -13,15 +13,15 @@ const VISIT_TYPES: {
   needsSchool: boolean
   isAbsence: boolean
 }[] = [
-  { value: 'technology_partner', label: 'TP Visit',     colour: '#C0392B', needsSchool: true,  isAbsence: false },
-  { value: 'handover',           label: 'Handover',      colour: '#7A5C2E', needsSchool: true,  isAbsence: false },
-  { value: 'shadow',             label: 'Shadow',        colour: '#3D6B5E', needsSchool: true,  isAbsence: false },
-  { value: 'installation',       label: 'Installation',  colour: '#1D6FA4', needsSchool: true,  isAbsence: false },
-  { value: 'phone_duty',         label: 'Phone duty',    colour: '#1A6FA8', needsSchool: false, isAbsence: false },
-  { value: 'other_visit',        label: 'Other visit',   colour: '#6B6B6B', needsSchool: false, isAbsence: false },
-  { value: 'annual_leave',       label: 'Annual leave',  colour: '#94a3b8', needsSchool: false, isAbsence: true  },
-  { value: 'sickness',           label: 'Sickness',      colour: '#ef4444', needsSchool: false, isAbsence: true  },
-  { value: 'other_absence',      label: 'Other absence', colour: '#a78bfa', needsSchool: false, isAbsence: true  },
+  { value: 'technology_partner', label: 'TP Visit',     colour: '#B91C1C', needsSchool: true,  isAbsence: false },
+  { value: 'handover',           label: 'Handover',      colour: '#92400E', needsSchool: true,  isAbsence: false },
+  { value: 'shadow',             label: 'Shadow',        colour: '#065F46', needsSchool: true,  isAbsence: false },
+  { value: 'installation',       label: 'Installation',  colour: '#1E40AF', needsSchool: true,  isAbsence: false },
+  { value: 'phone_duty',         label: 'Phone duty',    colour: '#0E7490', needsSchool: false, isAbsence: false },
+  { value: 'other_visit',        label: 'Other visit',   colour: '#374151', needsSchool: false, isAbsence: false },
+  { value: 'annual_leave',       label: 'Annual leave',  colour: '#0369A1', needsSchool: false, isAbsence: true  },
+  { value: 'sickness',           label: 'Sickness',      colour: '#DC2626', needsSchool: false, isAbsence: true  },
+  { value: 'other_absence',      label: 'Other absence', colour: '#7C3AED', needsSchool: false, isAbsence: true  },
 ]
 
 const DELETE_REASONS = [
@@ -358,6 +358,8 @@ export default function WeeklyPlannerPage() {
                     <td className="px-1 py-0.5 text-center border-r border-gray-100" style={{ background: slot === 'am' ? amBg : pmBg }}>
                       <span className={`text-xs font-medium px-1 py-0.5 rounded ${slot === 'am' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100'}`}>{slot.toUpperCase()}</span>
                     </td>
+                      <span className={`text-xs font-medium px-1 py-0.5 rounded ${slot === 'am' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100'}`}>{slot.toUpperCase()}</span>
+                    </td>
 
                     {weekDates.map(d => {
                       const visit = getVisit(tech.id, d.dateStr, slot)
@@ -369,7 +371,7 @@ export default function WeeklyPlannerPage() {
                       const inTerm = isInTerm(d.dateStr)
                       const todayStr = weekDates.find(w => w.isToday)?.dateStr ?? ''
                       const isPast = d.dateStr < todayStr && !d.isToday
-                      const cellBg = bh ? '#fef2f2' : !inTerm ? '#f8fafc' : slot === 'am' ? amBg : pmBg
+                      const cellBg = bh ? '#fef2f2' : !inTerm ? '#f8fafc' : d.isToday ? '#d1fae5' : slot === 'am' ? amBg : pmBg
                       const cfg = visit ? getVisitTypeConfig(visit.visit_type) : null
 
                       if (isBottomOfMerge) return null
