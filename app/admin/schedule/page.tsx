@@ -393,7 +393,7 @@ export default function WeeklyPlannerPage() {
                               title={visit.schools?.name ?? cfg?.label ?? ''}
                             >
                               <span className="truncate">
-                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞' : visit.schools?.short_name || visit.schools?.name?.split(' ')[0] || cfg?.label}
+                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞' : visit.visit_type === 'other_visit' ? (visit.notes || 'Other visit') : visit.schools?.short_name || visit.schools?.name?.split(' ')[0] || cfg?.label}
                               </span>
                               <div className="flex items-center gap-0.5 shrink-0">
                                 {visit.travel_warning && <span className="text-yellow-300">⚠</span>}
@@ -517,12 +517,15 @@ export default function WeeklyPlannerPage() {
               </label>
             </div>
             <div className="mb-4">
-              <p className="text-xs font-medium text-gray-700 mb-1">Notes <span className="text-gray-400">(optional)</span></p>
-              <input type="text" value={popNotes} onChange={e => setPopNotes(e.target.value)} placeholder="Any additional notes..."
+              <p className="text-xs font-medium text-gray-700 mb-1">
+                {popVisitType === 'other_visit' ? <>Description <span className="text-red-500">*</span></> : <>Notes <span className="text-gray-400">(optional)</span></>}
+              </p>
+              <input type="text" value={popNotes} onChange={e => setPopNotes(e.target.value)}
+                placeholder={popVisitType === 'other_visit' ? 'e.g. Training, Meeting, Office day…' : 'Any additional notes…'}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
             </div>
             <div className="flex gap-2">
-              <button onClick={savePopover} disabled={savingPop || (getVisitTypeConfig(popVisitType).needsSchool && !popSchoolId)}
+              <button onClick={savePopover} disabled={savingPop || (getVisitTypeConfig(popVisitType).needsSchool && !popSchoolId) || (popVisitType === 'other_visit' && !popNotes.trim())}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ background: BRAND_GREEN }}>
                 {savingPop ? 'Saving…' : popAddToBank ? 'Add to bank' : 'Add to slot'}
               </button>
