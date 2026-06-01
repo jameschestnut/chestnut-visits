@@ -372,7 +372,7 @@ export default function WeeklyPlannerPage() {
                       const cellBg = bh ? '#fef2f2' : !inTerm ? '#f8fafc' : slot === 'am' ? amBg : pmBg
                       const cfg = visit ? getVisitTypeConfig(visit.visit_type) : null
 
-                      if (isBottomOfMerge) return <td key={d.key} className="border-r border-gray-100 last:border-r-0" style={{ background: cellBg }} />
+                      if (isBottomOfMerge) return null
 
                       return (
                         <td key={d.key} className="px-1 py-0.5 border-r border-gray-100 last:border-r-0"
