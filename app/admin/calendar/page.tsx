@@ -72,6 +72,10 @@ export default function CalendarPage() {
   const [editingTerm, setEditingTerm] = useState<{ id?: string; term_name: string; start_date: string; end_date: string } | null>(null)
   const [savingTerm, setSavingTerm]   = useState(false)
 
+  // Bank holiday editing
+  const [editingHoliday, setEditingHoliday] = useState<{ id?: string; holiday_date: string; name: string } | null>(null)
+  const [savingHoliday, setSavingHoliday]   = useState(false)
+
   // Setup modal
   const [showSetup, setShowSetup]           = useState(false)
   const [setupStartDate, setSetupStartDate] = useState('')
@@ -266,6 +270,32 @@ export default function CalendarPage() {
 
   async function deleteTerm(id: string) {
     await supabase.from('term_dates').delete().eq('id', id)
+    window.location.reload()
+  }
+
+  async function saveHoliday() {
+    if (!editingHoliday || !editingHoliday.name.trim() || !editingHoliday.holiday_date) return
+    setSavingHoliday(true)
+    if (editingHoliday.id) {
+      await supabase.from('bank_holidays').update({
+        holiday_date: editingHoliday.holiday_date,
+        name:         editingHoliday.name.trim(),
+      }).eq('id', editingHoliday.id)
+    } else {
+      const { data: region } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
+      await supabase.from('bank_holidays').insert({
+        holiday_date: editingHoliday.holiday_date,
+        name:         editingHoliday.name.trim(),
+        region_id:    region?.id,
+      })
+    }
+    setSavingHoliday(false)
+    setEditingHoliday(null)
+    window.location.reload()
+  }
+
+  async function deleteHoliday(id: string) {
+    await supabase.from('bank_holidays').delete().eq('id', id)
     window.location.reload()
   }
 
@@ -519,6 +549,44 @@ export default function CalendarPage() {
         )}
       </div>
 
+      {/* Bank holidays */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-700">Bank holidays &amp; closures</h2>
+          <button onClick={() => setEditingHoliday({ holiday_date: '', name: '' })}
+            className="text-xs text-gray-400 hover:text-gray-700">
+            + Add
+          </button>
+        </div>
+        {bankHolidays.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">No bank holidays added yet</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                <th className="text-left pb-2">Date</th>
+                <th className="text-left pb-2">Name</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {[...bankHolidays].sort((a, b) => a.holiday_date.localeCompare(b.holiday_date)).map(h => (
+                <tr key={h.id} className="border-b border-gray-50 last:border-b-0">
+                  <td className="py-2 text-gray-500 w-40">{new Date(h.holiday_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td className="py-2 text-gray-800">{h.name}</td>
+                  <td className="py-2 text-right">
+                    <button onClick={() => setEditingHoliday({ id: h.id, holiday_date: h.holiday_date, name: h.name })}
+                      className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
+                    <button onClick={() => deleteHoliday(h.id)}
+                      className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* Add closure modal */}
       {addingException && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setAddingException(null)}>
@@ -590,6 +658,44 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {/* Bank holiday edit modal */}
+      {editingHoliday && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setEditingHoliday(null)}>
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">{editingHoliday.id ? 'Edit bank holiday' : 'Add bank holiday'}</h3>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                <input type="date" value={editingHoliday.holiday_date}
+                  onChange={e => setEditingHoliday(h => h && ({ ...h, holiday_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                <input type="text" value={editingHoliday.name}
+                  onChange={e => setEditingHoliday(h => h && ({ ...h, name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && saveHoliday()}
+                  placeholder="e.g. Christmas Day, INSET day"
+                  autoFocus
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={saveHoliday} disabled={savingHoliday || !editingHoliday.name.trim() || !editingHoliday.holiday_date}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
+                style={{ background: '#46DA26' }}>
+                {savingHoliday ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditingHoliday(null)}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Term edit modal */}
       {editingTerm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setEditingTerm(null)}>
@@ -601,7 +707,7 @@ export default function CalendarPage() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Term name</label>
                 <input type="text" value={editingTerm.term_name}
                   onChange={e => setEditingTerm(t => t && ({ ...t, term_name: e.target.value }))}
-                  placeholder="e.g. Autumn 1 2025-26"
+                  placeholder="e.g. 2026 Autumn 1"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
               </div>
               <div className="grid grid-cols-2 gap-3">
