@@ -358,8 +358,6 @@ export default function WeeklyPlannerPage() {
                     <td className="px-1 py-0.5 text-center border-r border-gray-100" style={{ background: slot === 'am' ? amBg : pmBg }}>
                       <span className={`text-xs font-medium px-1 py-0.5 rounded ${slot === 'am' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100'}`}>{slot.toUpperCase()}</span>
                     </td>
-                      <span className={`text-xs font-medium px-1 py-0.5 rounded ${slot === 'am' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100'}`}>{slot.toUpperCase()}</span>
-                    </td>
 
                     {weekDates.map(d => {
                       const visit = getVisit(tech.id, d.dateStr, slot)
