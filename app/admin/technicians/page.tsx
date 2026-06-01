@@ -48,7 +48,7 @@ export default function TechniciansPage() {
   }
 
   const filtered = technicians
-    .filter(t => hideInactive ? t.is_active : true)
+    .filter(t => (hideInactive && !search) ? t.is_active : true)
     .filter(t => !search || t.full_name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const av = (a[sortCol] ?? '').toLowerCase()

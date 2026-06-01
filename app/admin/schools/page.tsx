@@ -58,7 +58,7 @@ export default function SchoolsPage() {
   }
 
   const filtered = schools
-    .filter(s => hideInactive ? hasActiveContract(s) : true)
+    .filter(s => (hideInactive && !search) ? hasActiveContract(s) : true)
     .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.short_name?.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const av = (a[sortCol] ?? '').toLowerCase()

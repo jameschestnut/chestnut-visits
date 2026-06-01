@@ -76,6 +76,11 @@ export default function CalendarPage() {
   const [editingHoliday, setEditingHoliday] = useState<{ id?: string; holiday_date: string; name: string } | null>(null)
   const [savingHoliday, setSavingHoliday]   = useState(false)
 
+  // Year filters for term/holiday lists
+  const currentYear = new Date().getFullYear()
+  const [termYear, setTermYear]       = useState(currentYear)
+  const [holidayYear, setHolidayYear] = useState(currentYear)
+
   // Setup modal
   const [showSetup, setShowSetup]           = useState(false)
   const [setupStartDate, setSetupStartDate] = useState('')
@@ -512,79 +517,103 @@ export default function CalendarPage() {
       {/* Term dates */}
       <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-700">Term dates</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold text-gray-700">Term dates</h2>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setTermYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
+              <span className="text-xs font-medium text-gray-600 w-10 text-center">{termYear}</span>
+              <button onClick={() => setTermYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
+            </div>
+          </div>
           <button onClick={() => setEditingTerm({ term_name: '', start_date: '', end_date: '' })}
             className="text-xs text-gray-400 hover:text-gray-700">
             + Add term
           </button>
         </div>
-        {termDates.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No term dates added yet</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
-                <th className="text-left pb-2">Term</th>
-                <th className="text-left pb-2">Start</th>
-                <th className="text-left pb-2">End</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {[...termDates].sort((a, b) => a.start_date.localeCompare(b.start_date)).map(t => (
-                <tr key={t.id} className="border-b border-gray-50 last:border-b-0">
-                  <td className="py-2 font-medium text-gray-800">{t.term_name}</td>
-                  <td className="py-2 text-gray-500">{new Date(t.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                  <td className="py-2 text-gray-500">{new Date(t.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                  <td className="py-2 text-right">
-                    <button onClick={() => setEditingTerm({ id: t.id, term_name: t.term_name, start_date: t.start_date, end_date: t.end_date })}
-                      className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
-                    <button onClick={() => deleteTerm(t.id)}
-                      className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                  </td>
+        {(() => {
+          const rows = [...termDates]
+            .filter(t => parseInt(t.start_date.substring(0, 4)) === termYear)
+            .sort((a, b) => a.start_date.localeCompare(b.start_date))
+          return rows.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No terms for {termYear}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                  <th className="text-left pb-2">Term</th>
+                  <th className="text-left pb-2">Start</th>
+                  <th className="text-left pb-2">End</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {rows.map(t => (
+                  <tr key={t.id} className="border-b border-gray-50 last:border-b-0">
+                    <td className="py-2 font-medium text-gray-800">{t.term_name}</td>
+                    <td className="py-2 text-gray-500">{new Date(t.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                    <td className="py-2 text-gray-500">{new Date(t.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                    <td className="py-2 text-right">
+                      <button onClick={() => setEditingTerm({ id: t.id, term_name: t.term_name, start_date: t.start_date, end_date: t.end_date })}
+                        className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
+                      <button onClick={() => deleteTerm(t.id)}
+                        className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        })()}
       </div>
 
       {/* Bank holidays */}
       <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-700">Bank holidays &amp; closures</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold text-gray-700">Bank holidays &amp; closures</h2>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setHolidayYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
+              <span className="text-xs font-medium text-gray-600 w-10 text-center">{holidayYear}</span>
+              <button onClick={() => setHolidayYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
+            </div>
+          </div>
           <button onClick={() => setEditingHoliday({ holiday_date: '', name: '' })}
             className="text-xs text-gray-400 hover:text-gray-700">
             + Add
           </button>
         </div>
-        {bankHolidays.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No bank holidays added yet</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
-                <th className="text-left pb-2">Date</th>
-                <th className="text-left pb-2">Name</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {[...bankHolidays].sort((a, b) => a.holiday_date.localeCompare(b.holiday_date)).map(h => (
-                <tr key={h.id} className="border-b border-gray-50 last:border-b-0">
-                  <td className="py-2 text-gray-500 w-40">{new Date(h.holiday_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                  <td className="py-2 text-gray-800">{h.name}</td>
-                  <td className="py-2 text-right">
-                    <button onClick={() => setEditingHoliday({ id: h.id, holiday_date: h.holiday_date, name: h.name })}
-                      className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
-                    <button onClick={() => deleteHoliday(h.id)}
-                      className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                  </td>
+        {(() => {
+          const rows = [...bankHolidays]
+            .filter(h => parseInt(h.holiday_date.substring(0, 4)) === holidayYear)
+            .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date))
+          return rows.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No bank holidays for {holidayYear}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                  <th className="text-left pb-2">Date</th>
+                  <th className="text-left pb-2">Name</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {rows.map(h => (
+                  <tr key={h.id} className="border-b border-gray-50 last:border-b-0">
+                    <td className="py-2 text-gray-500 w-40">{new Date(h.holiday_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                    <td className="py-2 text-gray-800">{h.name}</td>
+                    <td className="py-2 text-right">
+                      <button onClick={() => setEditingHoliday({ id: h.id, holiday_date: h.holiday_date, name: h.name })}
+                        className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
+                      <button onClick={() => deleteHoliday(h.id)}
+                        className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        })()}
       </div>
 
       {/* Add closure modal */}
