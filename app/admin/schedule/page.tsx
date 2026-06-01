@@ -393,7 +393,7 @@ export default function WeeklyPlannerPage() {
                               title={visit.schools?.name ?? cfg?.label ?? ''}
                             >
                               <span className="truncate">
-                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞' : visit.schools?.short_name || visit.schools?.name?.split(' ')[0]}
+                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞' : visit.schools?.short_name || visit.schools?.name?.split(' ')[0] || cfg?.label}
                               </span>
                               <div className="flex items-center gap-0.5 shrink-0">
                                 {visit.travel_warning && <span className="text-yellow-300">⚠</span>}
