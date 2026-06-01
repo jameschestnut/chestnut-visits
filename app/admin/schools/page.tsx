@@ -18,8 +18,12 @@ export default function SchoolsPage() {
   const supabase = createClient()
   const router   = useRouter()
 
-  const [schools, setSchools] = useState<School[]>([])
-  const [loading, setLoading] = useState(true)
+  const [schools, setSchools]       = useState<School[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]         = useState('')
+  const [hideInactive, setHideInactive] = useState(true)
+  const [sortCol, setSortCol]       = useState<'name' | 'town'>('name')
+  const [sortDir, setSortDir]       = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     async function load() {
@@ -35,6 +39,20 @@ export default function SchoolsPage() {
 
   const activeCount   = schools.filter(s => s.is_active).length
   const inactiveCount = schools.filter(s => !s.is_active).length
+
+  function toggleSort(col: 'name' | 'town') {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const filtered = schools
+    .filter(s => hideInactive ? s.is_active : true)
+    .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.short_name?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const av = (a[sortCol] ?? '').toLowerCase()
+      const bv = (b[sortCol] ?? '').toLowerCase()
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    })
 
   if (loading) {
     return (
@@ -54,27 +72,42 @@ export default function SchoolsPage() {
             {inactiveCount > 0 && ` · ${inactiveCount} inactive`}
           </p>
         </div>
-        <Link
-          href="/admin/schools/new"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
-          style={{ background: '#46DA26' }}
-        >
-          <span>+</span> Add school
-        </Link>
+        <div className="flex items-center gap-3">
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search..."
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-48" />
+          {inactiveCount > 0 && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={hideInactive} onChange={e => setHideInactive(e.target.checked)} className="accent-gray-900" />
+              <span className="text-sm text-gray-600">Hide inactive</span>
+            </label>
+          )}
+          <Link
+            href="/admin/schools/new"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+            style={{ background: '#46DA26' }}
+          >
+            <span>+</span> Add school
+          </Link>
+        </div>
       </div>
 
-      {schools.length > 0 ? (
+      {filtered.length > 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">School</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Town</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800" onClick={() => toggleSort('name')}>
+                  School {sortCol === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800" onClick={() => toggleSort('town')}>
+                  Town {sortCol === 'town' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
               </tr>
             </thead>
             <tbody>
-              {schools.map(school => (
+              {filtered.map(school => (
                 <tr
                   key={school.id}
                   onClick={() => router.push(`/admin/schools/${school.id}`)}

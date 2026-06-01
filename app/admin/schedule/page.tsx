@@ -282,6 +282,23 @@ export default function WeeklyPlannerPage() {
             <span className="text-xs font-medium text-gray-700 w-44 text-center">{weekLabel}</span>
             <button onClick={() => setWeekOffset(w => w + 1)} className="w-7 h-7 rounded-md border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">›</button>
             {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded border border-gray-200">Today</button>}
+            <input type="date" title="Jump to week"
+              className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-500"
+              onChange={e => {
+                if (!e.target.value) return
+                const picked = new Date(e.target.value + 'T12:00:00')
+                const today = new Date()
+                const todayMon = new Date(today)
+                const todayDow = today.getDay()
+                todayMon.setDate(today.getDate() + (todayDow === 0 ? 1 : 1 - todayDow))
+                todayMon.setHours(0, 0, 0, 0)
+                const pickedDow = picked.getDay()
+                const pickedMon = new Date(picked)
+                pickedMon.setDate(picked.getDate() + (pickedDow === 0 ? 1 : 1 - pickedDow))
+                pickedMon.setHours(0, 0, 0, 0)
+                setWeekOffset(Math.round((pickedMon.getTime() - todayMon.getTime()) / (7 * 24 * 60 * 60 * 1000)))
+                e.target.value = ''
+              }} />
           </div>
           <div className="flex items-center gap-2">
             {pending.length > 0 && <span className="text-xs text-amber-600">{pending.length} unsaved</span>}

@@ -22,6 +22,9 @@ export default function TechniciansPage() {
   const [technicians, setTechnicians]   = useState<Technician[]>([])
   const [loading, setLoading]           = useState(true)
   const [hideInactive, setHideInactive] = useState(true)
+  const [search, setSearch]             = useState('')
+  const [sortCol, setSortCol]           = useState<'full_name' | 'job_title'>('full_name')
+  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     async function load() {
@@ -36,9 +39,22 @@ export default function TechniciansPage() {
     load()
   }, [])
 
-  const filtered      = hideInactive ? technicians.filter(t => t.is_active) : technicians
   const activeCount   = technicians.filter(t => t.is_active).length
   const inactiveCount = technicians.filter(t => !t.is_active).length
+
+  function toggleSort(col: 'full_name' | 'job_title') {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const filtered = technicians
+    .filter(t => hideInactive ? t.is_active : true)
+    .filter(t => !search || t.full_name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const av = (a[sortCol] ?? '').toLowerCase()
+      const bv = (b[sortCol] ?? '').toLowerCase()
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+    })
 
   if (loading) {
     return (
@@ -59,6 +75,9 @@ export default function TechniciansPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search..."
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-48" />
           {inactiveCount > 0 && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -85,8 +104,12 @@ export default function TechniciansPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Role</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800" onClick={() => toggleSort('full_name')}>
+                  Name {sortCol === 'full_name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800" onClick={() => toggleSort('job_title')}>
+                  Role {sortCol === 'job_title' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
               </tr>

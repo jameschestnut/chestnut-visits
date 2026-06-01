@@ -18,6 +18,7 @@ const MONTH_NAMES = [
 ]
 
 interface TermDate {
+  id: string
   term_name: string
   start_date: string
   end_date: string
@@ -66,6 +67,10 @@ export default function CalendarPage() {
   const [overrideWeek, setOverrideWeek]       = useState<string | null>(null)
   const [overrideValue, setOverrideValue]     = useState(1)
   const [saving, setSaving]                   = useState(false)
+
+  // Term editing
+  const [editingTerm, setEditingTerm] = useState<{ id?: string; term_name: string; start_date: string; end_date: string } | null>(null)
+  const [savingTerm, setSavingTerm]   = useState(false)
 
   // Setup modal
   const [showSetup, setShowSetup]           = useState(false)
@@ -235,6 +240,32 @@ export default function CalendarPage() {
 
     setSaving(false)
     setOverrideWeek(null)
+    window.location.reload()
+  }
+
+  async function saveTerm() {
+    if (!editingTerm || !editingTerm.term_name.trim() || !editingTerm.start_date || !editingTerm.end_date) return
+    setSavingTerm(true)
+    if (editingTerm.id) {
+      await supabase.from('term_dates').update({
+        term_name:  editingTerm.term_name.trim(),
+        start_date: editingTerm.start_date,
+        end_date:   editingTerm.end_date,
+      }).eq('id', editingTerm.id)
+    } else {
+      await supabase.from('term_dates').insert({
+        term_name:  editingTerm.term_name.trim(),
+        start_date: editingTerm.start_date,
+        end_date:   editingTerm.end_date,
+      })
+    }
+    setSavingTerm(false)
+    setEditingTerm(null)
+    window.location.reload()
+  }
+
+  async function deleteTerm(id: string) {
+    await supabase.from('term_dates').delete().eq('id', id)
     window.location.reload()
   }
 
@@ -448,6 +479,46 @@ export default function CalendarPage() {
         <div className="text-xs text-gray-400">Click any school day to add a closure</div>
       </div>
 
+      {/* Term dates */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-700">Term dates</h2>
+          <button onClick={() => setEditingTerm({ term_name: '', start_date: '', end_date: '' })}
+            className="text-xs text-gray-400 hover:text-gray-700">
+            + Add term
+          </button>
+        </div>
+        {termDates.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">No term dates added yet</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                <th className="text-left pb-2">Term</th>
+                <th className="text-left pb-2">Start</th>
+                <th className="text-left pb-2">End</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {[...termDates].sort((a, b) => a.start_date.localeCompare(b.start_date)).map(t => (
+                <tr key={t.id} className="border-b border-gray-50 last:border-b-0">
+                  <td className="py-2 font-medium text-gray-800">{t.term_name}</td>
+                  <td className="py-2 text-gray-500">{new Date(t.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td className="py-2 text-gray-500">{new Date(t.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td className="py-2 text-right">
+                    <button onClick={() => setEditingTerm({ id: t.id, term_name: t.term_name, start_date: t.start_date, end_date: t.end_date })}
+                      className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
+                    <button onClick={() => deleteTerm(t.id)}
+                      className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* Add closure modal */}
       {addingException && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setAddingException(null)}>
@@ -511,6 +582,50 @@ export default function CalendarPage() {
                 {saving ? 'Saving…' : 'Save'}
               </button>
               <button onClick={() => setOverrideWeek(null)}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Term edit modal */}
+      {editingTerm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setEditingTerm(null)}>
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-80" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">{editingTerm.id ? 'Edit term' : 'Add term'}</h3>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Term name</label>
+                <input type="text" value={editingTerm.term_name}
+                  onChange={e => setEditingTerm(t => t && ({ ...t, term_name: e.target.value }))}
+                  placeholder="e.g. Autumn 1 2025-26"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Start date</label>
+                  <input type="date" value={editingTerm.start_date}
+                    onChange={e => setEditingTerm(t => t && ({ ...t, start_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">End date</label>
+                  <input type="date" value={editingTerm.end_date} min={editingTerm.start_date}
+                    onChange={e => setEditingTerm(t => t && ({ ...t, end_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={saveTerm} disabled={savingTerm || !editingTerm.term_name.trim() || !editingTerm.start_date || !editingTerm.end_date}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
+                style={{ background: '#46DA26' }}>
+                {savingTerm ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditingTerm(null)}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
                 Cancel
               </button>
