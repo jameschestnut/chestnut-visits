@@ -78,6 +78,22 @@ export default function NewContractPage() {
     setLoading(true)
     setError(null)
 
+    // Check for overlapping contracts
+    const { data: existing } = await supabase
+      .from('contracts')
+      .select('id, start_date, end_date, frequency')
+      .eq('school_id', schoolId)
+      .neq('status', 'cancelled')
+    const overlap = (existing ?? []).find(
+      (c: { start_date: string; end_date: string }) =>
+        form.start_date <= c.end_date && c.start_date <= form.end_date
+    )
+    if (overlap) {
+      setError(`This period overlaps with an existing contract (${overlap.start_date} – ${overlap.end_date}).`)
+      setLoading(false)
+      return
+    }
+
     // Derive academic year from start date
     const startYear = new Date(form.start_date).getFullYear()
     const endYear   = new Date(form.end_date).getFullYear()

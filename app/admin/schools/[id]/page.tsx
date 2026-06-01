@@ -18,20 +18,11 @@ export default async function SchoolProfilePage({
   const { id } = await params
   const supabase = await createServiceSupabaseClient()
 
-  const [{ data: school }, { data: recentVisits }] = await Promise.all([
-    supabase
-      .from('schools')
-      .select(`*, school_contacts (*), contracts (*, visits (id, status))`)
-      .eq('id', id)
-      .single(),
-    supabase
-      .from('visits')
-      .select('id, visit_date, slot, visit_type, status, notes, technicians (full_name)')
-      .eq('school_id', id)
-      .not('visit_type', 'in', '("annual_leave","sickness","other_absence")')
-      .order('visit_date', { ascending: false })
-      .limit(20),
-  ])
+  const { data: school } = await supabase
+    .from('schools')
+    .select(`*, school_contacts (*), contracts (*, visits (id, status))`)
+    .eq('id', id)
+    .single()
 
   if (!school) notFound()
 
@@ -40,6 +31,17 @@ export default async function SchoolProfilePage({
     (c: { status: string; start_date: string; end_date: string }) =>
       c.status === 'active' && c.start_date <= today && c.end_date >= today
   )
+
+  const { data: contractVisits } = activeContract
+    ? await supabase
+        .from('visits')
+        .select('id, visit_date, slot, visit_type, status, notes, technicians (full_name)')
+        .eq('school_id', id)
+        .gte('visit_date', activeContract.start_date)
+        .lte('visit_date', activeContract.end_date)
+        .not('visit_type', 'in', '("annual_leave","sickness","other_absence")')
+        .order('visit_date', { ascending: true })
+    : { data: [] }
 
   const activeVisits   = activeContract?.visits ?? []
   const completedCount = activeVisits.filter((v: { status: string }) => v.status === 'completed').length
@@ -199,18 +201,29 @@ export default async function SchoolProfilePage({
             )}
           </div>
 
-          {/* Visit history */}
+          {/* Visits */}
           <div className="bg-white rounded-xl border border-gray-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-700">Visit history</h2>
+              <h2 className="text-sm font-semibold text-gray-700">
+                Visits
+                {activeContract && (
+                  <span className="ml-2 text-xs font-normal text-gray-400">
+                    {new Date(activeContract.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {' – '}
+                    {new Date(activeContract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+              </h2>
               <Link href="/admin/reports" className="text-xs text-gray-400 hover:text-gray-700">
                 Full report →
               </Link>
             </div>
 
-            {recentVisits && recentVisits.length > 0 ? (
+            {!activeContract ? (
+              <p className="text-sm text-gray-400 text-center py-4">No active contract</p>
+            ) : contractVisits && contractVisits.length > 0 ? (
               <div className="divide-y divide-gray-50">
-                {recentVisits.map((v: {
+                {contractVisits.map((v: {
                   id: string; visit_date: string; slot: string; visit_type: string
                   status: string; notes: string | null
                   technicians: { full_name: string } | null
@@ -241,7 +254,7 @@ export default async function SchoolProfilePage({
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 text-center py-4">No visits yet</p>
+              <p className="text-sm text-gray-400 text-center py-4">No visits scheduled yet</p>
             )}
           </div>
 
