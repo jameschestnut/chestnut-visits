@@ -20,13 +20,16 @@ const SLOT_OPTIONS = [
 ]
 
 const FREQUENCY_LABELS: Record<string, string> = {
-  weekly:       'Weekly',
-  fortnightly:  'Fortnightly',
-  three_weekly: 'Every 3 weeks',
-  monthly:      'Monthly',
-  half_termly:  'Half-termly',
-  termly:       'Termly',
-  custom:       'Custom',
+  weekly:                 'Weekly',
+  one_point_five_weekly:  '1.5x Weekly',
+  twice_weekly:           '2x Weekly',
+  three_times_weekly:     '3x Weekly',
+  fortnightly:            'Fortnightly',
+  three_weekly:           'Every 3 weeks',
+  monthly:                'Monthly',
+  half_termly:            'Half-termly',
+  termly:                 'Termly',
+  custom:                 'Custom',
 }
 
 const ROTA_COLOURS: Record<number, string> = {
@@ -124,7 +127,7 @@ export default function ScheduleGeneratorPage() {
         { data: visitData },
       ] = await Promise.all([
         supabase.from('schools').select('name').eq('id', schoolId).single(),
-        supabase.from('contracts').select('*').eq('school_id', schoolId).eq('status', 'active').single(),
+        supabase.from('contracts').select('*').eq('school_id', schoolId).eq('status', 'active').lte('start_date', new Date().toISOString().split('T')[0]).gte('end_date', new Date().toISOString().split('T')[0]).single(),
         supabase.from('technicians').select('id, full_name, initials').eq('is_active', true).order('full_name'),
         supabase.from('rota_calendar').select('week_start, rota_week').order('week_start'),
         supabase.from('term_dates').select('term_name, start_date, end_date').order('start_date'),
