@@ -31,6 +31,8 @@ export default function EditTechnicianPage() {
     notes:           '',
     is_active:       true,
     photo_url:       '',
+    job_title:       '',
+    date_of_birth:   '',
   })
 
   useEffect(() => {

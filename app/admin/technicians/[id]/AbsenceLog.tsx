@@ -163,12 +163,12 @@ export default function AbsenceLog({ techId }: { techId: string }) {
       // Show clash warning
       const clashList: ClashingVisit[] = existing.map((v: {
         id: string; visit_date: string; slot: string
-        schools: { name: string; short_name: string | null } | null
+        schools: { name: string; short_name: string | null }[] | null
       }) => ({
         id:          v.id,
         visit_date:  v.visit_date,
         slot:        v.slot,
-        school_name: v.schools?.short_name || v.schools?.name || 'Unknown',
+        school_name: v.schools?.[0]?.short_name || v.schools?.[0]?.name || 'Unknown',
       }))
       setClashes(clashList)
       setPendingRows(rows)

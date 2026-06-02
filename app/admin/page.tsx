@@ -192,7 +192,7 @@ export default async function AdminDashboard() {
 {(() => {
   const isFullDay = amVisit && pmVisit &&
     amVisit.visit_type === pmVisit.visit_type &&
-    (amVisit.schools as { id: string } | null)?.id === (pmVisit.schools as { id: string } | null)?.id
+    (amVisit.schools as { id: string }[] | null)?.[0]?.id === (pmVisit.schools as { id: string }[] | null)?.[0]?.id
 
   if (isFullDay) {
     return (
@@ -203,12 +203,12 @@ export default async function AdminDashboard() {
               ? { background: hatchStyle(VISIT_COLOURS[amVisit.visit_type] ?? '#94a3b8'), color: VISIT_COLOURS[amVisit.visit_type] ?? '#94a3b8', border: `1px solid ${VISIT_COLOURS[amVisit.visit_type] ?? '#94a3b8'}88` }
               : { background: VISIT_COLOURS[amVisit.visit_type] ?? '#C0392B', color: 'white' }
           }
-          title={(amVisit.schools as { name: string } | null)?.name ?? ''}>
+          title={(amVisit.schools as { name: string }[] | null)?.[0]?.name ?? ''}>
           <span className="truncate">
             {ABSENCE_TYPES.has(amVisit.visit_type)
               ? VISIT_LABELS[amVisit.visit_type]
-              : (amVisit.schools as { short_name: string | null; name: string } | null)?.short_name
-                || (amVisit.schools as { name: string } | null)?.name?.split(' ')[0]
+              : (amVisit.schools as { short_name: string | null; name: string }[] | null)?.[0]?.short_name
+                || (amVisit.schools as { name: string }[] | null)?.[0]?.name?.split(' ')[0]
                 || VISIT_LABELS[amVisit.visit_type]}
           </span>
           <span className="text-white/60 text-xs shrink-0">Full day</span>
@@ -228,11 +228,11 @@ export default async function AdminDashboard() {
                   ? { background: hatchStyle(VISIT_COLOURS[v.visit_type] ?? '#94a3b8'), color: VISIT_COLOURS[v.visit_type] ?? '#94a3b8', border: `1px solid ${VISIT_COLOURS[v.visit_type] ?? '#94a3b8'}88` }
                   : { background: VISIT_COLOURS[v.visit_type] ?? '#C0392B', color: 'white' }
               }
-              title={(v.schools as { name: string } | null)?.name ?? ''}>
+              title={(v.schools as { name: string }[] | null)?.[0]?.name ?? ''}>
               {ABSENCE_TYPES.has(v.visit_type)
                 ? VISIT_LABELS[v.visit_type]
-                : (v.schools as { short_name: string | null; name: string } | null)?.short_name
-                  || (v.schools as { name: string } | null)?.name?.split(' ')[0]
+                : (v.schools as { short_name: string | null; name: string }[] | null)?.[0]?.short_name
+                  || (v.schools as { name: string }[] | null)?.[0]?.name?.split(' ')[0]
                   || VISIT_LABELS[v.visit_type]}
             </div>
           ) : (
@@ -290,10 +290,10 @@ export default async function AdminDashboard() {
                 Disrupted ({disrupted!.length})
               </h3>
               <div className="space-y-2">
-                {disrupted!.slice(0, 3).map((v: { id: string; visit_date: string; schools: { name: string } | null; technicians: { full_name: string } | null }) => (
+                {disrupted!.slice(0, 3).map((v: { id: string; visit_date: string; schools: { name: string }[] | null; technicians: { full_name: string }[] | null }) => (
                   <div key={v.id} className="text-xs">
-                    <p className="font-medium text-gray-900 truncate">{v.schools?.name}</p>
-                    <p className="text-gray-400">{new Date(v.visit_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {v.technicians?.full_name.split(' ')[0]}</p>
+                    <p className="font-medium text-gray-900 truncate">{v.schools?.[0]?.name}</p>
+                    <p className="text-gray-400">{new Date(v.visit_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {v.technicians?.[0]?.full_name.split(' ')[0]}</p>
                   </div>
                 ))}
               </div>
@@ -309,9 +309,9 @@ export default async function AdminDashboard() {
                 Low feedback ({lowFeedback!.length})
               </h3>
               <div className="space-y-2">
-                {lowFeedback!.slice(0, 3).map((f: { id: string; rating: number; visits: { visit_date: string; schools: { name: string } | null } | null }) => (
+                {lowFeedback!.slice(0, 3).map((f: { id: string; rating: number; visits: { visit_date: string; schools: { name: string }[] }[] | null }) => (
                   <div key={f.id} className="text-xs">
-                    <p className="font-medium text-gray-900 truncate">{f.visits?.schools?.name}</p>
+                    <p className="font-medium text-gray-900 truncate">{f.visits?.[0]?.schools?.[0]?.name}</p>
                     <div className="flex items-center gap-0.5 mt-0.5">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <span key={i} className={i < f.rating ? 'text-amber-400' : 'text-gray-200'}>★</span>
