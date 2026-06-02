@@ -97,7 +97,7 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
       const result: DeliveryRow[] = ((contracts ?? []).map((c: {
         id: string; school_id: string; frequency: string; custom_visits_per_year: number | null
         start_date: string; end_date: string
-        schools: { id: string; name: string; short_name: string | null }[] | null
+        schools: unknown
       }) => {
         // Overlap between contract period and selected date range
         const contractStart = c.start_date > start ? c.start_date : start
@@ -136,7 +136,7 @@ function DeliveryReport({ start, end }: { start: string; end: string }) {
         return {
           contract_id: c.id,
           school_id:   c.school_id,
-          school_name: c.schools?.[0]?.name ?? 'Unknown',
+          school_name: (c.schools as { name: string } | null)?.name ?? 'Unknown',
           frequency:   c.frequency.replace('_', ' '),
           expected,
           scheduled,
@@ -443,17 +443,17 @@ function BankReport() {
       const today = new Date()
       const result: BankRow[] = (data ?? []).map((v: {
         id: string; visit_date: string; banked_at: string | null
-        schools: { id: string; name: string; short_name: string | null }[] | null
-        technicians: { id: string; full_name: string }[] | null
+        schools: unknown
+        technicians: unknown
       }) => {
         const bankedAt  = v.banked_at ? new Date(v.banked_at) : new Date(v.visit_date + 'T12:00:00')
         const daysOld   = Math.floor((today.getTime() - bankedAt.getTime()) / (1000*60*60*24))
         const overdue   = today >= addWorkingDays(bankedAt, 5)
         return {
           id:            v.id,
-          school_name:   v.schools?.[0]?.short_name || v.schools?.[0]?.name || 'Unknown',
-          school_id:     v.schools?.[0]?.id ?? '',
-          tech_name:     v.technicians?.[0]?.full_name ?? '—',
+          school_name:   (v.schools as { short_name: string | null; name: string } | null)?.short_name || (v.schools as { name: string } | null)?.name || 'Unknown',
+          school_id:     (v.schools as { id: string } | null)?.id ?? '',
+          tech_name:     (v.technicians as { full_name: string } | null)?.full_name ?? '—',
           original_date: v.visit_date,
           banked_at:     v.banked_at ?? v.visit_date,
           days_banked:   daysOld,
@@ -591,7 +591,7 @@ function SchoolVisitHistory({ start, end }: { start: string; end: string }) {
 
     setRows((data ?? []).map((v: {
       id: string; visit_date: string; slot: string; visit_type: string; status: string; notes: string | null
-      technicians: { full_name: string }[] | null
+      technicians: unknown
     }) => ({
       id:         v.id,
       visit_date: v.visit_date,
@@ -599,7 +599,7 @@ function SchoolVisitHistory({ start, end }: { start: string; end: string }) {
       visit_type: v.visit_type,
       status:     v.status,
       notes:      v.notes,
-      tech_name:  v.technicians?.[0]?.full_name ?? '—',
+      tech_name:  (v.technicians as { full_name: string } | null)?.full_name ?? '—',
     })))
     setLoading(false)
   }

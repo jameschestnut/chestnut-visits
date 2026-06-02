@@ -28,7 +28,7 @@ interface Visit {
   visit_type: string
   status: string
   notes: string | null
-  technicians: { full_name: string }[] | null
+  technicians: unknown
 }
 
 interface Contact {
@@ -195,7 +195,7 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
                   </span>
                   <span className="text-gray-600 flex-1 truncate">
                     {VISIT_TYPE_LABELS[v.visit_type] ?? v.visit_type}
-                    {v.technicians?.[0]?.full_name && ` · ${v.technicians[0].full_name.split(' ')[0]}`}
+                    {(v.technicians as { full_name: string } | null)?.full_name && ` · ${(v.technicians as { full_name: string }).full_name.split(' ')[0]}`}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${
                     v.status === 'completed' ? 'bg-green-50 text-green-700' :
