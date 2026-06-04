@@ -56,7 +56,7 @@ interface Visit {
   schools: unknown
 }
 interface School { id: string; name: string; short_name: string | null }
-interface SidebarVisit { id: string; school_id: string | null; school_name: string; visit_type: string; original_slot: string | null }
+interface SidebarVisit { id: string; school_id: string | null; school_name: string; visit_type: string; original_slot: string | null; visit_date: string | null }
 interface PendingChange { label: string; visitId: string; action: 'move' | 'bank'; newTechnicianId?: string; newDate?: string; newSlot?: string; newStatus?: string }
 interface BankHoliday { holiday_date: string; name: string }
 interface TermDate { start_date: string; end_date: string }
@@ -135,7 +135,7 @@ export default function WeeklyPlannerPage() {
       ] = await Promise.all([
         supabase.from('technicians').select('id, full_name, initials, photo_url').eq('is_active', true).order('full_name'),
         supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).not('status','in','("banked","completed")').gte('visit_date', weekStart).lte('visit_date', weekEnd),
-        supabase.from('visits').select(`id, school_id, visit_type, slot, schools (id, name, short_name)`).eq('status', 'banked'),
+        supabase.from('visits').select(`id, school_id, visit_type, slot, visit_date, schools (id, name, short_name)`).eq('status', 'banked').gte('visit_date', (() => { const d = new Date(weekDates[0].dateStr); d.setDate(d.getDate() - 7); return toDateStr(d) })()).lte('visit_date', (() => { const d = new Date(weekDates[4].dateStr); d.setDate(d.getDate() + 7); return toDateStr(d) })()),
         supabase.from('bank_holidays').select('holiday_date, name'),
         supabase.from('term_dates').select('start_date, end_date'),
         supabase.from('schools').select('id, name, short_name').eq('is_active', true).order('name'),
@@ -145,10 +145,10 @@ export default function WeeklyPlannerPage() {
       setBankHolidays(holidays ?? [])
       setTermDates(terms ?? [])
       setSchools(schoolList ?? [])
-      setSidebar((bankedVisits ?? []).map((v: { id: string; school_id: string | null; visit_type: string; slot: string; schools: unknown }) => ({
+      setSidebar((bankedVisits ?? []).map((v: { id: string; school_id: string | null; visit_type: string; slot: string; visit_date: string; schools: unknown }) => ({
         id: v.id, school_id: v.school_id,
         school_name: (v.schools as { short_name: string | null; name: string } | null)?.short_name || (v.schools as { name: string } | null)?.name || 'No school',
-        visit_type: v.visit_type, original_slot: v.slot,
+        visit_type: v.visit_type, original_slot: v.slot, visit_date: v.visit_date,
       })))
       setLoading(false)
     }
@@ -185,7 +185,7 @@ export default function WeeklyPlannerPage() {
       setPending(prev => [...prev, { label: `${(visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name || getVisitTypeConfig(visit.visit_type).label}: → ${targetDate} ${targetSlot.toUpperCase()}`, visitId, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot }])
     } else if (drag.current.source === 'sidebar' && drag.current.sidebarItem) {
       const item = drag.current.sidebarItem
-      setVisits(prev => [...prev, { id: item.id, school_id: item.school_id, technician_id: targetTech, visit_date: targetDate, slot: targetSlot, status: 'confirmed', visit_type: item.visit_type, travel_warning: false, notes: null, schools: item.school_id ? { id: item.school_id, name: item.school_name, short_name: null } : null }])
+      setVisits(prev => [...prev, { id: item.id, school_id: item.school_id, technician_id: targetTech, visit_date: targetDate, slot: targetSlot, status: 'confirmed', visit_type: item.visit_type, travel_warning: false, notes: null, schools: item.school_id ? { id: item.school_id, name: item.school_name, short_name: null } : null } as unknown as Visit])
       setSidebar(prev => prev.filter(s => s.id !== item.id))
       setPending(prev => [...prev, { label: `${item.school_name}: scheduled ${targetDate} ${targetSlot.toUpperCase()}`, visitId: item.id, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot, newStatus: 'confirmed' }])
     }
@@ -201,7 +201,7 @@ export default function WeeklyPlannerPage() {
   drag.current = null
   const visit = visits.find(v => v.id === visitId)
   if (!visit || getVisitTypeConfig(visit.visit_type).isAbsence) return
-  setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: (visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot }])
+  setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: (visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot, visit_date: visit.visit_date }])
   setVisits(prev => prev.filter(v => v.id !== visitId))
   setPending(prev => [...prev, { label: `${(visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name}: banked`, visitId: visit.id, action: 'bank' }])
 }
@@ -227,7 +227,7 @@ export default function WeeklyPlannerPage() {
     if (!error && newVisit) {
       if (popAddToBank) {
         const school = schools.find(s => s.id === popSchoolId)
-        setSidebar(prev => [...prev, { id: newVisit.id, school_id: newVisit.school_id, school_name: school?.short_name || school?.name || 'No school', visit_type: newVisit.visit_type, original_slot: newVisit.slot }])
+        setSidebar(prev => [...prev, { id: newVisit.id, school_id: newVisit.school_id, school_name: school?.short_name || school?.name || 'No school', visit_type: newVisit.visit_type, original_slot: newVisit.slot, visit_date: newVisit.visit_date }])
       } else {
         const { data: refreshed } = await supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).not('status','in','("banked","completed")').gte('visit_date', weekDates[0].dateStr).lte('visit_date', weekDates[4].dateStr)
         setVisits(refreshed ?? [])
@@ -454,6 +454,7 @@ export default function WeeklyPlannerPage() {
                     style={{ background: cfg.colour }}>
                     <div className="truncate text-xs">{item.school_name}</div>
                     <div className="text-white/70 text-xs">{cfg.label}</div>
+                    {item.visit_date && <div className="text-white/60 text-xs">{new Date(item.visit_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>}
                   </div>
                 )
               })
