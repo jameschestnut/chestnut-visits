@@ -176,8 +176,9 @@ export default async function AdminDashboard() {
               </thead>
               <tbody>
                 {(technicians ?? []).map((tech: { id: string; full_name: string; initials: string }, ti: number) => {
-                  const amVisit = (todayVisits ?? []).find((v: { technician_id: string; slot: string }) => v.technician_id === tech.id && v.slot === 'am')
-                  const pmVisit = (todayVisits ?? []).find((v: { technician_id: string; slot: string }) => v.technician_id === tech.id && v.slot === 'pm')
+                  const amVisit      = (todayVisits ?? []).find((v: { technician_id: string; slot: string }) => v.technician_id === tech.id && v.slot === 'am')
+                  const pmVisit      = (todayVisits ?? []).find((v: { technician_id: string; slot: string }) => v.technician_id === tech.id && v.slot === 'pm')
+                  const fullDayVisit = (todayVisits ?? []).find((v: { technician_id: string; slot: string }) => v.technician_id === tech.id && v.slot === 'full_day')
                   const bgAlt   = ti % 2 === 0 ? 'bg-white' : 'bg-[#f0fdf8]/60'
                   const displayName = getDisplayName(tech.full_name, allNames)
 
@@ -190,26 +191,28 @@ export default async function AdminDashboard() {
 </td>
 
 {(() => {
-  const isFullDay = amVisit && pmVisit &&
+  const isFullDay = (amVisit && pmVisit &&
     amVisit.visit_type === pmVisit.visit_type &&
-    (amVisit.schools as unknown as { id: string } | null)?.id === (pmVisit.schools as unknown as { id: string } | null)?.id
+    (amVisit.schools as unknown as { id: string } | null)?.id === (pmVisit.schools as unknown as { id: string } | null)?.id) || !!fullDayVisit
 
-  if (isFullDay) {
+  const fullDaySource = fullDayVisit ?? amVisit
+
+  if (isFullDay && fullDaySource) {
     return (
       <td colSpan={2} className="px-2 py-1.5">
         <div className="rounded px-2 py-1 text-xs font-medium truncate flex items-center gap-1"
           style={
-            ABSENCE_TYPES.has(amVisit.visit_type)
-              ? { background: hatchStyle(VISIT_COLOURS[amVisit.visit_type] ?? '#94a3b8'), color: VISIT_COLOURS[amVisit.visit_type] ?? '#94a3b8', border: `1px solid ${VISIT_COLOURS[amVisit.visit_type] ?? '#94a3b8'}88` }
-              : { background: VISIT_COLOURS[amVisit.visit_type] ?? '#C0392B', color: 'white' }
+            ABSENCE_TYPES.has(fullDaySource.visit_type)
+              ? { background: hatchStyle(VISIT_COLOURS[fullDaySource.visit_type] ?? '#94a3b8'), color: VISIT_COLOURS[fullDaySource.visit_type] ?? '#94a3b8', border: `1px solid ${VISIT_COLOURS[fullDaySource.visit_type] ?? '#94a3b8'}88` }
+              : { background: VISIT_COLOURS[fullDaySource.visit_type] ?? '#C0392B', color: 'white' }
           }
-          title={(amVisit.schools as unknown as { name: string } | null)?.name ?? ''}>
+          title={(fullDaySource.schools as unknown as { name: string } | null)?.name ?? ''}>
           <span className="truncate">
-            {ABSENCE_TYPES.has(amVisit.visit_type)
-              ? VISIT_LABELS[amVisit.visit_type]
-              : (amVisit.schools as unknown as { short_name: string | null; name: string } | null)?.short_name
-                || (amVisit.schools as unknown as { name: string } | null)?.name?.split(' ')[0]
-                || VISIT_LABELS[amVisit.visit_type]}
+            {ABSENCE_TYPES.has(fullDaySource.visit_type)
+              ? VISIT_LABELS[fullDaySource.visit_type]
+              : (fullDaySource.schools as unknown as { short_name: string | null; name: string } | null)?.short_name
+                || (fullDaySource.schools as unknown as { name: string } | null)?.name?.split(' ')[0]
+                || VISIT_LABELS[fullDaySource.visit_type]}
           </span>
           <span className="text-white/60 text-xs shrink-0">Full day</span>
         </div>
