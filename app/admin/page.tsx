@@ -7,6 +7,7 @@ const VISIT_COLOURS: Record<string, string> = {
   installation:       '#1D6FA4',
   handover:           '#7A5C2E',
   shadow:             '#3D6B5E',
+  other_visit:        '#374151',
   annual_leave:       '#94a3b8',
   sickness:           '#ef4444',
   other_absence:      '#a78bfa',
@@ -18,6 +19,7 @@ const VISIT_LABELS: Record<string, string> = {
   installation:       'Installation',
   handover:           'Handover',
   shadow:             'Shadow',
+  other_visit:        'Other visit',
   annual_leave:       'Annual leave',
   sickness:           'Sickness',
   other_absence:      'Other absence',
@@ -210,9 +212,11 @@ export default async function AdminDashboard() {
           <span className="truncate">
             {ABSENCE_TYPES.has(fullDaySource.visit_type)
               ? VISIT_LABELS[fullDaySource.visit_type]
-              : (fullDaySource.schools as unknown as { short_name: string | null; name: string } | null)?.short_name
-                || (fullDaySource.schools as unknown as { name: string } | null)?.name?.split(' ')[0]
-                || VISIT_LABELS[fullDaySource.visit_type]}
+              : fullDaySource.visit_type === 'other_visit'
+                ? ((fullDaySource as { notes: string | null }).notes || 'Other visit')
+                : (fullDaySource.schools as unknown as { short_name: string | null; name: string } | null)?.short_name
+                  || (fullDaySource.schools as unknown as { name: string } | null)?.name?.split(' ')[0]
+                  || VISIT_LABELS[fullDaySource.visit_type]}
           </span>
           <span className="text-white/60 text-xs shrink-0">Full day</span>
         </div>
@@ -234,9 +238,11 @@ export default async function AdminDashboard() {
               title={(v.schools as unknown as { name: string } | null)?.name ?? ''}>
               {ABSENCE_TYPES.has(v.visit_type)
                 ? VISIT_LABELS[v.visit_type]
-                : (v.schools as unknown as { short_name: string | null; name: string } | null)?.short_name
-                  || (v.schools as unknown as { name: string } | null)?.name?.split(' ')[0]
-                  || VISIT_LABELS[v.visit_type]}
+                : v.visit_type === 'other_visit'
+                  ? ((v as { notes: string | null }).notes || 'Other visit')
+                  : (v.schools as unknown as { short_name: string | null; name: string } | null)?.short_name
+                    || (v.schools as unknown as { name: string } | null)?.name?.split(' ')[0]
+                    || VISIT_LABELS[v.visit_type]}
             </div>
           ) : (
             <div className="rounded border border-dashed border-gray-100 h-7" />
