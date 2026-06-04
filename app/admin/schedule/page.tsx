@@ -53,7 +53,7 @@ interface Technician { id: string; full_name: string; initials: string; photo_ur
 interface Visit {
   id: string; school_id: string | null; technician_id: string; visit_date: string
   slot: string; status: string; visit_type: string; travel_warning: boolean; notes: string | null
-  schools: { id: string; name: string; short_name: string | null }[] | null
+  schools: unknown
 }
 interface School { id: string; name: string; short_name: string | null }
 interface SidebarVisit { id: string; school_id: string | null; school_name: string; visit_type: string; original_slot: string | null }
@@ -145,9 +145,9 @@ export default function WeeklyPlannerPage() {
       setBankHolidays(holidays ?? [])
       setTermDates(terms ?? [])
       setSchools(schoolList ?? [])
-      setSidebar((bankedVisits ?? []).map((v: { id: string; school_id: string | null; visit_type: string; slot: string; schools: { id: string; name: string; short_name: string | null }[] | null }) => ({
+      setSidebar((bankedVisits ?? []).map((v: { id: string; school_id: string | null; visit_type: string; slot: string; schools: unknown }) => ({
         id: v.id, school_id: v.school_id,
-        school_name: v.schools?.[0]?.short_name || v.schools?.[0]?.name || 'No school',
+        school_name: (v.schools as { short_name: string | null; name: string } | null)?.short_name || (v.schools as { name: string } | null)?.name || 'No school',
         visit_type: v.visit_type, original_slot: v.slot,
       })))
       setLoading(false)
@@ -182,10 +182,10 @@ export default function WeeklyPlannerPage() {
       const visit = visits.find(v => v.id === visitId)
       if (!visit || (visit.technician_id === targetTech && visit.visit_date === targetDate && visit.slot === targetSlot)) return
       setVisits(prev => prev.map(v => v.id === visitId ? { ...v, technician_id: targetTech, visit_date: targetDate, slot: targetSlot } : v))
-      setPending(prev => [...prev, { label: `${visit.schools?.[0]?.short_name || visit.schools?.[0]?.name || getVisitTypeConfig(visit.visit_type).label}: → ${targetDate} ${targetSlot.toUpperCase()}`, visitId, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot }])
+      setPending(prev => [...prev, { label: `${(visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name || getVisitTypeConfig(visit.visit_type).label}: → ${targetDate} ${targetSlot.toUpperCase()}`, visitId, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot }])
     } else if (drag.current.source === 'sidebar' && drag.current.sidebarItem) {
       const item = drag.current.sidebarItem
-      setVisits(prev => [...prev, { id: item.id, school_id: item.school_id, technician_id: targetTech, visit_date: targetDate, slot: targetSlot, status: 'confirmed', visit_type: item.visit_type, travel_warning: false, notes: null, schools: item.school_id ? [{ id: item.school_id, name: item.school_name, short_name: null }] : null }])
+      setVisits(prev => [...prev, { id: item.id, school_id: item.school_id, technician_id: targetTech, visit_date: targetDate, slot: targetSlot, status: 'confirmed', visit_type: item.visit_type, travel_warning: false, notes: null, schools: item.school_id ? { id: item.school_id, name: item.school_name, short_name: null } : null }])
       setSidebar(prev => prev.filter(s => s.id !== item.id))
       setPending(prev => [...prev, { label: `${item.school_name}: scheduled ${targetDate} ${targetSlot.toUpperCase()}`, visitId: item.id, action: 'move', newTechnicianId: targetTech, newDate: targetDate, newSlot: targetSlot, newStatus: 'confirmed' }])
     }
@@ -201,9 +201,9 @@ export default function WeeklyPlannerPage() {
   drag.current = null
   const visit = visits.find(v => v.id === visitId)
   if (!visit || getVisitTypeConfig(visit.visit_type).isAbsence) return
-  setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: visit.schools?.[0]?.short_name || visit.schools?.[0]?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot }])
+  setSidebar(prev => [...prev, { id: visit.id, school_id: visit.school_id, school_name: (visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name || 'Unknown', visit_type: visit.visit_type, original_slot: visit.slot }])
   setVisits(prev => prev.filter(v => v.id !== visitId))
-  setPending(prev => [...prev, { label: `${visit.schools?.[0]?.short_name || visit.schools?.[0]?.name}: banked`, visitId: visit.id, action: 'bank' }])
+  setPending(prev => [...prev, { label: `${(visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name}: banked`, visitId: visit.id, action: 'bank' }])
 }
 
   function openPopover(techId: string, techName: string, dateStr: string, slot: string) {
@@ -390,10 +390,10 @@ export default function WeeklyPlannerPage() {
                               onDragStart={() => !cfg?.isAbsence && onDragStartGrid(visit)}
                               className={`rounded text-xs font-medium flex items-center justify-between gap-0.5 px-1.5 py-0.5 select-none ${!cfg?.isAbsence ? 'cursor-grab active:cursor-grabbing' : ''} ${visit.status === 'completed' ? 'opacity-60' : ''}`}
                               style={{ minHeight: mergeType ? 52 : 24, ...(cfg?.isAbsence ? { ...hatchStyle(cfg.colour), color: cfg.colour } : { background: cfg?.colour ?? '#C0392B', color: 'white' }) }}
-                              title={visit.schools?.[0]?.name ?? cfg?.label ?? ''}
+                              title={(visit.schools as { name: string } | null)?.name ?? cfg?.label ?? ''}
                             >
                               <span className="truncate">
-                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞' : visit.visit_type === 'other_visit' ? (visit.notes || 'Other visit') : visit.schools?.[0]?.short_name || visit.schools?.[0]?.name?.split(' ')[0] || cfg?.label}
+                                {cfg?.isAbsence ? cfg.label : visit.visit_type === 'phone_duty' ? '📞' : visit.visit_type === 'other_visit' ? (visit.notes || 'Other visit') : (visit.schools as { short_name: string | null; name: string } | null)?.short_name || (visit.schools as { name: string } | null)?.name?.split(' ')[0] || cfg?.label}
                               </span>
                               <div className="flex items-center gap-0.5 shrink-0">
                                 {visit.travel_warning && <span className="text-yellow-300">⚠</span>}
@@ -543,7 +543,7 @@ export default function WeeklyPlannerPage() {
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Delete visit</h3>
             <p className="text-xs text-gray-500 mb-4">
               {getVisitTypeConfig(deleteTarget.visit_type).label}
-              {deleteTarget.schools?.[0] ? ` — ${deleteTarget.schools[0].name}` : ''}
+              {deleteTarget.schools ? ` — ${(deleteTarget.schools as { name: string }).name}` : ''}
               {' · '}{new Date(deleteTarget.visit_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               {' · '}{deleteTarget.slot.toUpperCase()}
               {getFullDayMerge(deleteTarget.technician_id, deleteTarget.visit_date) ? ' · full day (both slots)' : ''}
