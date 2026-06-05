@@ -36,19 +36,18 @@ export default function LoginPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
 
         {/* Logo mark */}
-        <div className="flex justify-center mb-6">
-          <div className="w-10 h-10 rounded-lg bg-chestnut flex items-center justify-center"
-               style={{ background: '#8B3A2A' }}>
-            <span className="text-white font-semibold text-sm">CI</span>
+        <div className="flex flex-col items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+               style={{ background: '#46DA26' }}>
+            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.5 2 5.5 4.5 5 8c-.2 1.4.1 2.7.8 3.8L4 20h16l-1.8-8.2c.7-1.1 1-2.4.8-3.8C18.5 4.5 15.5 2 12 2zm0 2c2.8 0 5 2.2 5 5s-2.2 5-5 5-5-2.2-5-5 2.2-5 5-5z"/>
+            </svg>
+          </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Chestnut Schedule</h1>
+            <p className="mt-0.5 text-sm text-gray-400">Chestnut Infrastructure</p>
           </div>
         </div>
-
-        <h1 className="text-center text-2xl font-semibold text-gray-900 tracking-tight">
-          Chestnut Infrastructure
-        </h1>
-        <p className="mt-1 text-center text-sm text-gray-500">
-          Visit scheduling
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -100,7 +99,8 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading || !email}
-                  className="w-full py-2.5 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-full py-2.5 px-4 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                  style={{ background: '#46DA26' }}
                 >
                   {loading ? 'Sending…' : 'Send sign-in link'}
                 </button>

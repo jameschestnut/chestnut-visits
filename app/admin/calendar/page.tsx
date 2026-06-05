@@ -409,7 +409,7 @@ export default function CalendarPage() {
     { key: 'calendar',  label: 'Calendar' },
     { key: 'terms',     label: 'Term dates' },
     { key: 'holidays',  label: 'Bank holidays' },
-    { key: 'tags',      label: 'Rota tags' },
+    { key: 'tags',      label: 'Schedule weeks' },
   ]
 
   return (
