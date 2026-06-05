@@ -92,6 +92,10 @@ export default function CalendarPage() {
   const [savingTagId, setSavingTagId] = useState<string | null>(null)
   const [tagWarning, setTagWarning]   = useState<string | null>(null)
 
+  // Calendar frequency highlight
+  const [highlightFreq, setHighlightFreq]   = useState<string>('')
+  const [highlightGroup, setHighlightGroup] = useState<string>('')
+
   // Setup modal
   const [showSetup, setShowSetup]           = useState(false)
   const [setupStartDate, setSetupStartDate] = useState('')
@@ -448,7 +452,7 @@ export default function CalendarPage() {
       {/* ── Calendar tab ── */}
       {activeTab === 'calendar' && (
         <>
-          {/* Month nav */}
+          {/* Month nav + frequency picker */}
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
@@ -463,41 +467,118 @@ export default function CalendarPage() {
             >›</button>
           </div>
 
+          {/* Frequency highlight controls */}
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <span className="text-xs text-gray-500">Highlight:</span>
+            <div className="flex gap-1 flex-wrap">
+              {[
+                { value: '',                    label: 'None' },
+                { value: 'weekly',              label: 'Weekly' },
+                { value: 'twice_weekly',        label: '2× Weekly' },
+                { value: 'three_times_weekly',  label: '3× Weekly' },
+                { value: 'fortnightly',         label: 'Fortnightly' },
+                { value: 'one_point_five_weekly', label: '1.5×' },
+                { value: 'monthly',             label: 'Monthly' },
+                { value: 'three_weekly',        label: '3-weekly' },
+                { value: 'half_termly',         label: 'Half-termly' },
+              ].map(opt => (
+                <button key={opt.value}
+                  onClick={() => { setHighlightFreq(opt.value); setHighlightGroup('') }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                    highlightFreq === opt.value
+                      ? 'border-gray-900 bg-gray-900 text-white'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {(highlightFreq === 'fortnightly' || highlightFreq === 'one_point_five_weekly') && (
+              <div className="flex gap-1">
+                {['', '1', '2'].map(g => (
+                  <button key={g}
+                    onClick={() => setHighlightGroup(g)}
+                    className={`px-2 py-1 rounded-md text-xs font-medium border transition-colors ${
+                      highlightGroup === g
+                        ? 'border-gray-900 bg-gray-900 text-white'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}>
+                    {g === '' ? 'Both' : `Group ${g}`}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(highlightFreq === 'monthly' || highlightFreq === 'three_weekly' || highlightFreq === 'half_termly') && (
+              <div className="flex gap-1">
+                {['', '1', '2', '3', '4', '5', '6'].map(g => (
+                  <button key={g}
+                    onClick={() => setHighlightGroup(g)}
+                    className={`px-2 py-1 rounded-md text-xs font-medium border transition-colors ${
+                      highlightGroup === g
+                        ? 'border-gray-900 bg-gray-900 text-white'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}>
+                    {g === '' ? 'All' : g}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Calendar grid */}
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <div className="grid grid-cols-8 border-b border-gray-100 bg-gray-50">
-              <div className="px-3 py-2 text-xs font-medium text-gray-400 text-center">Rota</div>
+            <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50">
               {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
                 <div key={d} className="px-3 py-2 text-xs font-medium text-gray-400 text-center">{d}</div>
               ))}
             </div>
 
             {grid.map((week, wi) => {
-              const rota          = week[0].rotaWeek
               const isHolidayWeek = !week.slice(0, 5).some(d => d.isInTerm)
-              const rotaColour    = rota ? ROTA_COLOURS[rota] : '#94a3b8'
+              const rota          = rotaCalendar.find(r => r.week_start === week[0].weekStart)
+
+              // Determine highlight colour for this week
+              let highlightColour: string | null = null
+              if (highlightFreq && rota && !isHolidayWeek) {
+                const FREQ_COLOURS: Record<string, string> = {
+                  weekly:                 '#46DA26',
+                  twice_weekly:           '#1A6FA8',
+                  three_times_weekly:     '#3D6B5E',
+                  fortnightly:            '#C0392B',
+                  one_point_five_weekly:  '#7A5C2E',
+                  monthly:                '#6B3A7A',
+                  three_weekly:           '#2C6E8A',
+                  half_termly:            '#B45309',
+                }
+                const FORTNIGHTLY_COLOURS: Record<number, string> = { 1: '#C0392B', 2: '#1A6FA8' }
+                const MONTHLY_COLOURS: Record<number, string> = {
+                  1: '#C0392B', 2: '#1A6FA8', 3: '#3D6B5E', 4: '#7A5C2E', 5: '#6B3A7A', 6: '#2C6E8A',
+                }
+
+                if ((highlightFreq === 'weekly' || highlightFreq === 'twice_weekly' || highlightFreq === 'three_times_weekly') && rota.tag_weekly) {
+                  highlightColour = FREQ_COLOURS[highlightFreq]
+                } else if (highlightFreq === 'fortnightly' && rota.tag_fortnightly) {
+                  if (!highlightGroup || highlightGroup === String(rota.tag_fortnightly)) {
+                    highlightColour = FORTNIGHTLY_COLOURS[rota.tag_fortnightly] ?? FREQ_COLOURS.fortnightly
+                  }
+                } else if (highlightFreq === 'one_point_five_weekly' && rota.tag_fortnightly) {
+                  if (!highlightGroup || highlightGroup === String(rota.tag_fortnightly)) {
+                    highlightColour = FORTNIGHTLY_COLOURS[rota.tag_fortnightly] ?? FREQ_COLOURS.one_point_five_weekly
+                  }
+                } else if ((highlightFreq === 'monthly' || highlightFreq === 'three_weekly' || highlightFreq === 'half_termly') && rota.tag_monthly) {
+                  if (!highlightGroup || highlightGroup === String(rota.tag_monthly)) {
+                    highlightColour = MONTHLY_COLOURS[rota.tag_monthly] ?? FREQ_COLOURS.monthly
+                  }
+                }
+              }
 
               return (
-                <div key={wi} className={`grid grid-cols-8 border-b border-gray-50 last:border-b-0 ${
+                <div key={wi} className={`grid grid-cols-7 border-b border-gray-50 last:border-b-0 relative ${
                   isHolidayWeek ? 'bg-gray-50/60' : ''
-                }`}>
-                  <div className="flex items-center justify-center px-2 py-2 border-r border-gray-50">
-                    {rota && !isHolidayWeek ? (
-                      <button
-                        onClick={() => { setOverrideWeek(week[0].weekStart); setOverrideValue(rota) }}
-                        className="w-7 h-7 rounded-full text-xs font-bold text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        style={{
-                          background:  rotaColour,
-                          boxShadow:   week[0].isRotaOverride ? `0 0 0 2px white, 0 0 0 3px ${rotaColour}` : 'none',
-                        }}
-                        title={`Rota week ${rota}${week[0].isRotaOverride ? ' (override)' : ''} — click to change`}
-                      >
-                        {rota}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-gray-300">—</span>
-                    )}
-                  </div>
+                }`} style={highlightColour ? { borderLeft: `3px solid ${highlightColour}` } : {}}>
+                  {highlightColour && (
+                    <div className="absolute left-0 inset-y-0 w-0.5" style={{ background: highlightColour }} />
+                  )}
 
                   {week.map((day, di) => {
                     const isToday  = day.dateStr === toStr(today)
@@ -532,7 +613,7 @@ export default function CalendarPage() {
                           const termStart = termDates.find(t => t.term_name === day.termName)?.start_date
                           if (day.termName && day.dateStr === termStart) {
                             return (
-                              <div className="text-xs font-semibold truncate leading-tight" style={{ color: rotaColour }}>
+                              <div className="text-xs font-semibold truncate leading-tight text-gray-500">
                                 {day.termName}
                               </div>
                             )
@@ -561,13 +642,6 @@ export default function CalendarPage() {
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 px-1">
-            {[1,2,3,4,5,6].map(w => (
-              <div key={w} className="flex items-center gap-1.5 text-xs text-gray-500">
-                <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  style={{ background: ROTA_COLOURS[w] }}>{w}</div>
-                W{w}
-              </div>
-            ))}
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <div className="w-4 h-4 rounded bg-gray-100 border border-gray-200" /> Holiday
             </div>
@@ -725,7 +799,6 @@ export default function CalendarPage() {
                   <thead>
                     <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
                       <th className="text-left pb-2 pr-4">Week commencing</th>
-                      <th className="text-left pb-2 pr-4">Rota W</th>
                       <th className="text-left pb-2 pr-4">Weekly</th>
                       <th className="text-left pb-2 pr-4">Fortnightly</th>
                       <th className="text-left pb-2">Monthly</th>
@@ -739,14 +812,6 @@ export default function CalendarPage() {
                         <tr key={r.id} style={{ background: bg }}>
                           <td className="py-1.5 pr-4 text-gray-700">
                             {new Date(r.week_start + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </td>
-                          <td className="py-1.5 pr-4">
-                            <span
-                              className="inline-flex w-6 h-6 items-center justify-center rounded-full text-white text-xs font-bold"
-                              style={{ background: ROTA_COLOURS[r.rota_week] ?? '#94a3b8' }}
-                            >
-                              {r.rota_week}
-                            </span>
                           </td>
                           <td className="py-1.5 pr-4">
                             <span className="inline-flex items-center gap-1 text-xs text-green-700">

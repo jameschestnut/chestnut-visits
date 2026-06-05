@@ -13,6 +13,7 @@ interface Technician {
   is_active: boolean
   photo_url: string | null
   job_title: string | null
+  leaving_date: string | null
 }
 
 export default function TechniciansPage() {
@@ -29,17 +30,22 @@ export default function TechniciansPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
+      const today = new Date().toISOString().split('T')[0]
       const { data } = await supabase
         .from('technicians')
-        .select('id, full_name, initials, email, is_active, photo_url, job_title')
+        .select('id, full_name, initials, email, is_active, photo_url, job_title, leaving_date')
         .order('full_name')
-      setTechnicians(data ?? [])
+      // Include active techs + anyone with a future leaving date (still current employees)
+      setTechnicians((data ?? []).filter((t: Technician) =>
+        t.is_active || (t.leaving_date && t.leaving_date >= today)
+      ))
       setLoading(false)
     }
     load()
   }, [])
 
   const activeCount   = technicians.filter(t => t.is_active).length
+  const leaverCount   = technicians.filter(t => !t.is_active && t.leaving_date).length
   const inactiveCount = technicians.filter(t => !t.is_active).length
 
   function toggleSort(col: 'full_name' | 'job_title') {
@@ -47,8 +53,9 @@ export default function TechniciansPage() {
     else { setSortCol(col); setSortDir('asc') }
   }
 
+  const today = new Date().toISOString().split('T')[0]
   const filtered = technicians
-    .filter(t => (hideInactive && !search) ? t.is_active : true)
+    .filter(t => (hideInactive && !search) ? (t.is_active || (t.leaving_date && t.leaving_date >= today)) : true)
     .filter(t => !search || t.full_name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const av = (a[sortCol] ?? '').toLowerCase()
@@ -71,6 +78,7 @@ export default function TechniciansPage() {
           <h1 className="text-xl font-semibold text-gray-900">Technicians</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {activeCount} active
+            {leaverCount > 0 && ` · ${leaverCount} leaving`}
             {inactiveCount > 0 && ` · ${inactiveCount} inactive`}
           </p>
         </div>
@@ -140,11 +148,17 @@ export default function TechniciansPage() {
                   <td className="px-4 py-3 text-gray-500">{tech.job_title ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{tech.email}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      tech.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {tech.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    {tech.is_active && tech.leaving_date ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">
+                        Leaving {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </span>
+                    ) : (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        tech.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {tech.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
