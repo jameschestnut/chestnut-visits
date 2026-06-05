@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
 
 const VISIT_TYPE_LABELS: Record<string, string> = {
   technology_partner: 'TP Visit',
@@ -60,7 +61,10 @@ function fmtDate(dateStr: string) {
   })
 }
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
 export default function SchoolContractView({ schoolId, contracts, allVisits, contacts }: Props) {
+  const supabase = createClient()
   const today = new Date().toISOString().split('T')[0]
 
   const sorted = [...contracts].sort(
@@ -72,11 +76,21 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
     sorted[0]
 
   const [selectedId, setSelectedId] = useState<string>(defaultContract?.id ?? '')
+  const [visits, setVisits] = useState<Visit[]>(allVisits)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const selected = sorted.find(c => c.id === selectedId) ?? null
 
   const contractVisits = selected
-    ? allVisits.filter(v => v.visit_date >= selected.start_date && v.visit_date <= selected.end_date)
+    ? visits.filter(v => v.visit_date >= selected.start_date && v.visit_date <= selected.end_date)
     : []
+
+  async function deleteVisit(visitId: string) {
+    if (!confirm('Delete this visit? This cannot be undone.')) return
+    setDeletingId(visitId)
+    await supabase.from('visits').delete().eq('id', visitId)
+    setVisits(prev => prev.filter(v => v.id !== visitId))
+    setDeletingId(null)
+  }
 
   const completed  = contractVisits.filter(v => v.status === 'completed').length
   const banked     = contractVisits.filter(v => v.status === 'banked').length
@@ -185,29 +199,42 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
             <p className="text-sm text-gray-400 text-center py-4">No contract selected</p>
           ) : contractVisits.length > 0 ? (
             <div className="divide-y divide-gray-50">
-              {contractVisits.map(v => (
-                <div key={v.id} className="flex items-center gap-3 py-2 text-xs">
-                  <span className="text-gray-500 w-24 shrink-0">{fmtDate(v.visit_date)}</span>
-                  <span className={`px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                    v.slot === 'am' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'
-                  }`}>
-                    {v.slot.toUpperCase()}
-                  </span>
-                  <span className="text-gray-600 flex-1 truncate">
-                    {VISIT_TYPE_LABELS[v.visit_type] ?? v.visit_type}
-                    {(v.technicians as { full_name: string } | null)?.full_name && ` · ${(v.technicians as { full_name: string }).full_name.split(' ')[0]}`}
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${
-                    v.status === 'completed' ? 'bg-green-50 text-green-700' :
-                    v.status === 'confirmed' ? 'bg-blue-50 text-blue-700' :
-                    v.status === 'banked'    ? 'bg-purple-50 text-purple-700' :
-                    v.status === 'disrupted' ? 'bg-red-50 text-red-700' :
-                    'bg-gray-100 text-gray-500'
-                  }`}>
-                    {v.status}
-                  </span>
-                </div>
-              ))}
+              {contractVisits.map(v => {
+                const dayName = DAY_NAMES[new Date(v.visit_date + 'T12:00:00').getDay()]
+                return (
+                  <div key={v.id} className="flex items-center gap-2 py-2 text-xs group">
+                    <span className="text-gray-400 w-6 shrink-0">{dayName}</span>
+                    <span className="text-gray-500 w-20 shrink-0">{fmtDate(v.visit_date)}</span>
+                    <span className={`px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                      v.slot === 'am'       ? 'bg-blue-50 text-blue-700' :
+                      v.slot === 'pm'       ? 'bg-orange-50 text-orange-700' :
+                      v.slot === 'full_day' ? 'bg-gray-100 text-gray-600' :
+                                              'bg-gray-50 text-gray-500'
+                    }`}>
+                      {v.slot === 'full_day' ? 'Full' : v.slot.toUpperCase()}
+                    </span>
+                    <span className="text-gray-600 flex-1 truncate">
+                      {VISIT_TYPE_LABELS[v.visit_type] ?? v.visit_type}
+                      {(v.technicians as { full_name: string } | null)?.full_name && ` · ${(v.technicians as { full_name: string }).full_name.split(' ')[0]}`}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${
+                      v.status === 'completed' ? 'bg-green-50 text-green-700' :
+                      v.status === 'confirmed' ? 'bg-blue-50 text-blue-700' :
+                      v.status === 'banked'    ? 'bg-purple-50 text-purple-700' :
+                      v.status === 'disrupted' ? 'bg-red-50 text-red-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {v.status}
+                    </span>
+                    <button
+                      onClick={() => deleteVisit(v.id)}
+                      disabled={deletingId === v.id}
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all shrink-0 disabled:opacity-30"
+                      title="Delete visit"
+                    >×</button>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <p className="text-sm text-gray-400 text-center py-4">No visits scheduled yet</p>

@@ -91,7 +91,7 @@ export default async function AdminDashboard() {
       .eq('status', 'disrupted').order('visit_date'),
     supabase.from('visits')
       .select('id, visit_date, banked_at, schools (id, name, short_name)')
-      .eq('status', 'banked').order('banked_at'),
+      .eq('status', 'banked').lte('visit_date', in7Str).order('banked_at'),
     supabase.from('visit_feedback')
       .select('id, rating, submitted_at, visits (visit_date, schools (id, name))')
       .lte('rating', 2).eq('needs_followup', true)
