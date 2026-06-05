@@ -40,6 +40,8 @@ export default function NewContractPage() {
     frequency: 'fortnightly',
     custom_visits_per_year: '',
     visit_duration: 'half_day',
+    fortnightly_tag: '' as '' | '1' | '2',
+    monthly_tags: [] as number[],
     notes: '',
   })
 
@@ -50,7 +52,20 @@ export default function NewContractPage() {
       if (name === 'start_date' && value > prev.end_date) {
         updated.end_date = value
       }
+      if (name === 'frequency') {
+        updated.fortnightly_tag = ''
+        updated.monthly_tags = []
+      }
       return updated
+    })
+  }
+
+  function toggleMonthlyTag(tag: number) {
+    setForm(prev => {
+      const tags = prev.monthly_tags.includes(tag)
+        ? prev.monthly_tags.filter(t => t !== tag)
+        : [...prev.monthly_tags, tag].sort()
+      return { ...prev, monthly_tags: tags }
     })
   }
 
@@ -114,6 +129,8 @@ export default function NewContractPage() {
                                    : null,
         visit_duration:          form.visit_duration,
         status:                  'active',
+        fortnightly_tag:         form.fortnightly_tag ? parseInt(form.fortnightly_tag) : null,
+        monthly_tags:            form.monthly_tags.length > 0 ? form.monthly_tags : null,
         notes:                   form.notes.trim() || null,
       })
 
@@ -229,6 +246,58 @@ export default function NewContractPage() {
             <span className="text-sm font-semibold text-gray-900">{expectedVisits()}</span>
           </div>
         </div>
+
+        {/* Rota tags */}
+        {(form.frequency === 'fortnightly' || form.frequency === 'one_point_five_weekly') && (
+          <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700">Fortnightly tag</h2>
+            <p className="text-xs text-gray-400">Which fortnightly group does this school visit on?</p>
+            <div className="flex gap-3">
+              {(['1', '2'] as const).map(tag => (
+                <label key={tag}
+                  className={`flex-1 flex items-center justify-center px-3 py-2.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors ${
+                    form.fortnightly_tag === tag
+                      ? 'border-gray-900 bg-gray-900 text-white'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  <input type="radio" name="fortnightly_tag" value={tag}
+                    checked={form.fortnightly_tag === tag}
+                    onChange={handleChange} className="sr-only" />
+                  Group {tag}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(form.frequency === 'monthly' || form.frequency === 'three_weekly' || form.frequency === 'half_termly') && (
+          <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700">Monthly tags</h2>
+            <p className="text-xs text-gray-400">
+              {form.frequency === 'half_termly'
+                ? 'Select 1 tag (one visit per half-term).'
+                : form.frequency === 'three_weekly'
+                ? 'Select a pair (1&4, 2&5, or 3&6).'
+                : 'Select a pair for monthly visits (1&4, 2&5, or 3&6).'}
+            </p>
+            <div className="flex gap-2">
+              {[1,2,3,4,5,6].map(tag => (
+                <button key={tag} type="button"
+                  onClick={() => toggleMonthlyTag(tag)}
+                  className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors border ${
+                    form.monthly_tags.includes(tag)
+                      ? 'border-gray-900 bg-gray-900 text-white'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}>
+                  {tag}
+                </button>
+              ))}
+            </div>
+            {form.monthly_tags.length > 0 && (
+              <p className="text-xs text-gray-500">Selected: {form.monthly_tags.join(', ')}</p>
+            )}
+          </div>
+        )}
 
         {/* Visit duration */}
         <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">

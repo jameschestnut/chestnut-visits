@@ -14,52 +14,21 @@ const DAY_OPTIONS = [
 ]
 
 const SLOT_OPTIONS = [
-  { value: 'am',       label: 'AM (09:00–13:00)' },
-  { value: 'pm',       label: 'PM (13:00–17:00)' },
-  { value: 'full_day', label: 'Full day (09:00–17:00)' },
+  { value: 'am', label: 'AM (09:00–13:00)' },
+  { value: 'pm', label: 'PM (13:00–17:00)' },
 ]
 
 const FREQUENCY_LABELS: Record<string, string> = {
-  weekly:                 'Weekly',
-  one_point_five_weekly:  '1.5x Weekly',
-  twice_weekly:           '2x Weekly',
-  three_times_weekly:     '3x Weekly',
-  fortnightly:            'Fortnightly',
-  three_weekly:           'Every 3 weeks',
-  monthly:                'Monthly',
-  half_termly:            'Half-termly',
-  termly:                 'Termly',
-  custom:                 'Custom',
-}
-
-const ROTA_COLOURS: Record<number, string> = {
-  1: '#C0392B',
-  2: '#1A6FA8',
-  3: '#3D6B5E',
-  4: '#7A5C2E',
-  5: '#6B3A7A',
-  6: '#2C6E8A',
-}
-
-// Suggested rota week selections per frequency
-const FREQUENCY_SUGGESTIONS: Record<string, number[][]> = {
-  weekly:       [[1,2,3,4,5,6]],
-  fortnightly:  [[1,3,5],[2,4,6]],
-  three_weekly: [[1,4],[2,5],[3,6]],
-  monthly:      [[1,5],[2,6],[3,1],[4,2]],
-  half_termly:  [[1],[2],[3],[4],[5],[6]],
-  termly:       [[1],[2],[3],[4],[5],[6]],
-  custom:       [],
-}
-
-interface GeneratedVisit {
-  date: string
-  day: string
-  slot: string
-  term: string
-  rotaWeek: number
-  isBankHoliday: boolean
-  conflict: boolean
+  weekly:                'Weekly',
+  one_point_five_weekly: '1.5x Weekly',
+  twice_weekly:          '2x Weekly',
+  three_times_weekly:    '3x Weekly',
+  fortnightly:           'Fortnightly',
+  three_weekly:          'Every 3 weeks',
+  monthly:               'Monthly',
+  half_termly:           'Half-termly',
+  termly:                'Termly',
+  custom:                'Custom',
 }
 
 interface Contract {
@@ -67,19 +36,16 @@ interface Contract {
   start_date: string
   end_date: string
   frequency: string
-  custom_visits_per_year: number | null
   visit_duration: string
-}
-
-interface Technician {
-  id: string
-  full_name: string
-  initials: string
+  fortnightly_tag: number | null
+  monthly_tags: number[] | null
 }
 
 interface RotaWeek {
   week_start: string
-  rota_week: number
+  tag_weekly: boolean | null
+  tag_fortnightly: number | null
+  tag_monthly: number | null
 }
 
 interface TermDate {
@@ -88,32 +54,57 @@ interface TermDate {
   end_date: string
 }
 
+interface GeneratedVisit {
+  date: string
+  slot: string
+  termName: string
+  isBankHoliday: boolean
+  bhAdjusted: boolean
+  conflict: boolean
+}
+
+function toStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d)
+  r.setDate(r.getDate() + n)
+  return r
+}
+
+function getMondayOf(d: Date): Date {
+  const r = new Date(d)
+  const day = r.getDay()
+  r.setDate(r.getDate() - (day === 0 ? 6 : day - 1))
+  return r
+}
+
 export default function ScheduleGeneratorPage() {
-  const router = useRouter()
-  const params = useParams()
+  const router   = useRouter()
+  const params   = useParams()
   const schoolId = params.id as string
   const supabase = createClient()
 
-  const [school, setSchool]             = useState<{ name: string } | null>(null)
-  const [contract, setContract]         = useState<Contract | null>(null)
-  const [technicians, setTechnicians]   = useState<Technician[]>([])
+  const [school, setSchool]           = useState<{ name: string } | null>(null)
+  const [contract, setContract]       = useState<Contract | null>(null)
+  const [technicians, setTechnicians] = useState<{ id: string; full_name: string; initials: string }[]>([])
   const [rotaCalendar, setRotaCalendar] = useState<RotaWeek[]>([])
-  const [termDates, setTermDates]       = useState<TermDate[]>([])
+  const [termDates, setTermDates]     = useState<TermDate[]>([])
   const [bankHolidays, setBankHolidays] = useState<Set<string>>(new Set())
   const [existingVisits, setExistingVisits] = useState<{ visit_date: string; slot: string; technician_id: string }[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [noRota, setNoRota]             = useState(false)
+  const [loading, setLoading]         = useState(true)
+  const [noRota, setNoRota]           = useState(false)
 
-  const [form, setForm] = useState({
-    technician_id:       '',
-    preferred_day:       1,
-    preferred_slot:      'am',
-    selected_rota_weeks: [1, 3, 5] as number[],
-  })
+  const [techId, setTechId]           = useState('')
+  const [preferredDay, setPreferredDay] = useState(1)
+  const [preferredSlot, setPreferredSlot] = useState('am')
+  // For termly/custom: manual dates
+  const [manualDates, setManualDates] = useState<string[]>([''])
 
-  const [preview, setPreview] = useState<GeneratedVisit[] | null>(null)
-  const [saving, setSaving]   = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [preview, setPreview]         = useState<GeneratedVisit[] | null>(null)
+  const [saving, setSaving]           = useState(false)
+  const [error, setError]             = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -127,12 +118,16 @@ export default function ScheduleGeneratorPage() {
         { data: visitData },
       ] = await Promise.all([
         supabase.from('schools').select('name').eq('id', schoolId).single(),
-        supabase.from('contracts').select('*').eq('school_id', schoolId).eq('status', 'active').lte('start_date', new Date().toISOString().split('T')[0]).gte('end_date', new Date().toISOString().split('T')[0]).single(),
-        supabase.from('technicians').select('id, full_name, initials').eq('is_active', true).order('full_name'),
-        supabase.from('rota_calendar').select('week_start, rota_week').order('week_start'),
-        supabase.from('term_dates').select('term_name, start_date, end_date').order('start_date'),
+        supabase.from('contracts').select('id,start_date,end_date,frequency,visit_duration,fortnightly_tag,monthly_tags')
+          .eq('school_id', schoolId).eq('status', 'active')
+          .lte('start_date', new Date().toISOString().split('T')[0])
+          .gte('end_date', new Date().toISOString().split('T')[0])
+          .single(),
+        supabase.from('technicians').select('id,full_name,initials').eq('is_active', true).order('full_name'),
+        supabase.from('rota_calendar').select('week_start,tag_weekly,tag_fortnightly,tag_monthly').order('week_start'),
+        supabase.from('term_dates').select('term_name,start_date,end_date').order('start_date'),
         supabase.from('bank_holidays').select('holiday_date'),
-        supabase.from('visits').select('visit_date, slot, technician_id').eq('school_id', schoolId),
+        supabase.from('visits').select('visit_date,slot,technician_id').eq('school_id', schoolId),
       ])
 
       setSchool(schoolData)
@@ -144,113 +139,152 @@ export default function ScheduleGeneratorPage() {
       setExistingVisits(visitData ?? [])
       setNoRota(!rotaData || rotaData.length === 0)
       setLoading(false)
-
-      if (contractData?.frequency) {
-        const suggestions = FREQUENCY_SUGGESTIONS[contractData.frequency]
-        if (suggestions?.length > 0) {
-          setForm(f => ({ ...f, selected_rota_weeks: suggestions[0] }))
-        }
-      }
     }
     load()
   }, [schoolId])
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  function toStr(date: Date): string {
-    const y = date.getFullYear()
-    const m = String(date.getMonth() + 1).padStart(2, '0')
-    const d = String(date.getDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
-  }
-
-  function addDays(date: Date, n: number): Date {
-    const d = new Date(date)
-    d.setDate(d.getDate() + n)
-    return d
-  }
-
-  function getMonday(date: Date): Date {
-    const d = new Date(date)
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    return d
-  }
-
-  function getRotaWeekForDate(monday: Date): number | null {
-    return rotaCalendar.find(r => r.week_start === toStr(monday))?.rota_week ?? null
-  }
-
   function getTermName(dateStr: string): string {
-    const term = termDates.find(t => dateStr >= t.start_date && dateStr <= t.end_date)
-    return term?.term_name ?? 'School holiday'
+    const t = termDates.find(t => dateStr >= t.start_date && dateStr <= t.end_date)
+    return t?.term_name ?? 'School holiday'
   }
 
-  function isBankHoliday(dateStr: string): boolean {
-    return bankHolidays.has(dateStr)
+  function isTermTime(weekStart: string): boolean {
+    const weekEnd = toStr(addDays(new Date(weekStart + 'T12:00:00'), 4))
+    return termDates.some(t => weekStart <= t.end_date && t.start_date <= weekEnd)
   }
 
-  function hasConflict(dateStr: string, slot: string, techId: string): boolean {
+  function hasConflict(dateStr: string, slot: string, tid: string): boolean {
     return existingVisits.some(v =>
-      v.visit_date === dateStr &&
-      v.technician_id === techId &&
+      v.visit_date === dateStr && v.technician_id === tid &&
       (v.slot === slot || slot === 'full_day' || v.slot === 'full_day')
     )
   }
 
-  function toggleRotaWeek(week: number) {
-    setForm(prev => {
-      const current = prev.selected_rota_weeks
-      const updated = current.includes(week)
-        ? current.filter(w => w !== week)
-        : [...current, week].sort()
-      return { ...prev, selected_rota_weeks: updated }
-    })
-    setPreview(null)
+  function resolveDate(weekStart: Date, dayOffset: number): { date: string; bhAdjusted: boolean } {
+    const d     = addDays(weekStart, dayOffset)
+    const dStr  = toStr(d)
+    if (bankHolidays.has(dStr)) {
+      const tue     = addDays(weekStart, dayOffset === 0 ? 1 : dayOffset + 1)
+      return { date: toStr(tue), bhAdjusted: true }
+    }
+    return { date: dStr, bhAdjusted: false }
+  }
+
+  // ── Tag validation ─────────────────────────────────────────────────────────
+
+  function contractNeedsFortnightlyTag(): boolean {
+    return ['fortnightly', 'one_point_five_weekly'].includes(contract?.frequency ?? '')
+  }
+
+  function contractNeedsMonthlyTags(): boolean {
+    return ['monthly', 'three_weekly', 'half_termly'].includes(contract?.frequency ?? '')
+  }
+
+  function tagsConfigured(): boolean {
+    if (!contract) return false
+    const freq = contract.frequency
+    if (freq === 'fortnightly' || freq === 'one_point_five_weekly') {
+      return contract.fortnightly_tag === 1 || contract.fortnightly_tag === 2
+    }
+    if (freq === 'monthly' || freq === 'three_weekly' || freq === 'half_termly') {
+      return Array.isArray(contract.monthly_tags) && contract.monthly_tags.length > 0
+    }
+    return true
   }
 
   // ── Generate ───────────────────────────────────────────────────────────────
 
   function generatePreview() {
-    if (!contract || !form.technician_id || form.selected_rota_weeks.length === 0) return
+    if (!contract || !techId) return
     setError(null)
 
-    const visits: GeneratedVisit[] = []
-    const dayNames  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const dayOffset = form.preferred_day - 1
+    const freq      = contract.frequency
+    const isManual  = freq === 'termly' || freq === 'custom'
 
+    if (isManual) {
+      const visits: GeneratedVisit[] = []
+      for (const ds of manualDates) {
+        if (!ds) continue
+        const isBH = bankHolidays.has(ds)
+        visits.push({
+          date:        ds,
+          slot:        contract.visit_duration === 'full_day' ? 'full_day' : preferredSlot,
+          termName:    getTermName(ds),
+          isBankHoliday: isBH,
+          bhAdjusted:  false,
+          conflict:    hasConflict(ds, preferredSlot, techId),
+        })
+      }
+      if (visits.length === 0) { setError('Add at least one visit date.'); return }
+      setPreview(visits)
+      return
+    }
+
+    const visits: GeneratedVisit[] = []
     const contractStart = new Date(contract.start_date + 'T12:00:00')
     const contractEnd   = new Date(contract.end_date + 'T12:00:00')
+    const dayOffset     = preferredDay - 1  // 0=Mon, 1=Tue, …
 
-    let weekStart = getMonday(contractStart)
+    let weekStart = getMondayOf(contractStart)
 
     while (weekStart <= contractEnd) {
-      const rotaWeek = getRotaWeekForDate(weekStart)
+      const wsStr = toStr(weekStart)
+      const rota  = rotaCalendar.find(r => r.week_start === wsStr)
 
-      if (rotaWeek && form.selected_rota_weeks.includes(rotaWeek)) {
-        const visitDate = addDays(weekStart, dayOffset)
-        const dateStr   = toStr(visitDate)
-        const bankHol   = isBankHoliday(dateStr)
+      if (!rota) { weekStart = addDays(weekStart, 7); continue }
+      if (!isTermTime(wsStr)) { weekStart = addDays(weekStart, 7); continue }
 
+      const addVisit = (offset: number, slot: string) => {
+        const { date, bhAdjusted } = resolveDate(weekStart, offset)
+        if (date < contract.start_date || date > contract.end_date) return
         visits.push({
-          date:          dateStr,
-          day:           dayNames[visitDate.getDay()],
-          slot:          form.preferred_slot,
-          term:          bankHol ? 'Bank holiday' : getTermName(dateStr),
-          rotaWeek,
-          isBankHoliday: bankHol,
-          conflict:      !bankHol && hasConflict(dateStr, form.preferred_slot, form.technician_id),
+          date,
+          slot,
+          termName:    getTermName(date),
+          isBankHoliday: bankHolidays.has(date),
+          bhAdjusted,
+          conflict:    hasConflict(date, slot, techId),
         })
+      }
+
+      const slot = contract.visit_duration === 'full_day' ? 'full_day' : preferredSlot
+
+      if (freq === 'weekly' && rota.tag_weekly) {
+        addVisit(dayOffset, slot)
+      } else if (freq === 'twice_weekly' && rota.tag_weekly) {
+        addVisit(dayOffset, 'full_day')
+      } else if (freq === 'three_times_weekly' && rota.tag_weekly) {
+        addVisit(0, slot)  // Monday
+        addVisit(2, slot)  // Wednesday
+        addVisit(4, slot)  // Friday
+      } else if (freq === 'fortnightly' && rota.tag_fortnightly === contract.fortnightly_tag) {
+        addVisit(dayOffset, slot)
+      } else if (freq === 'one_point_five_weekly') {
+        if (rota.tag_fortnightly === contract.fortnightly_tag) {
+          addVisit(dayOffset, 'full_day')
+        } else if (rota.tag_weekly) {
+          addVisit(dayOffset, preferredSlot)
+        }
+      } else if ((freq === 'monthly' || freq === 'three_weekly') &&
+                 Array.isArray(contract.monthly_tags) &&
+                 rota.tag_monthly !== null &&
+                 contract.monthly_tags.includes(rota.tag_monthly)) {
+        addVisit(dayOffset, slot)
+      } else if (freq === 'half_termly' &&
+                 Array.isArray(contract.monthly_tags) &&
+                 rota.tag_monthly !== null &&
+                 contract.monthly_tags.includes(rota.tag_monthly)) {
+        addVisit(dayOffset, slot)
       }
 
       weekStart = addDays(weekStart, 7)
     }
 
     if (visits.length === 0) {
-      setError('No visits generated. Make sure the rota calendar covers the contract period and the selected rota weeks are correct.')
+      setError('No visits generated. Check the rota calendar tags match the contract settings.')
     }
-
     setPreview(visits)
   }
 
@@ -261,27 +295,20 @@ export default function ScheduleGeneratorPage() {
     setSaving(true)
     setError(null)
 
-    const { error } = await supabase
-      .from('visits')
-      .insert(
-        preview.map(v => ({
-          school_id:     schoolId,
-          technician_id: form.technician_id,
-          contract_id:   contract.id,
-          visit_date:    v.date,
-          slot:          v.slot,
-          status:        v.isBankHoliday ? 'banked' : 'confirmed',
-          visit_type:    'technology_partner',
-          banked_at:     v.isBankHoliday ? new Date().toISOString() : null,
-        }))
-      )
+    const { error: err } = await supabase.from('visits').insert(
+      preview.map(v => ({
+        school_id:     schoolId,
+        technician_id: techId,
+        contract_id:   contract.id,
+        visit_date:    v.date,
+        slot:          v.slot,
+        status:        'confirmed',
+        visit_type:    'technology_partner',
+        notes:         v.bhAdjusted ? 'Moved from bank holiday Monday' : null,
+      }))
+    )
 
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
-
+    if (err) { setError(err.message); setSaving(false); return }
     router.push(`/admin/schools/${schoolId}`)
     router.refresh()
   }
@@ -309,7 +336,7 @@ export default function ScheduleGeneratorPage() {
           <p className="text-xs text-amber-600 mb-4">Add a contract before generating a schedule.</p>
           <Link href={`/admin/schools/${schoolId}/contracts/new`}
             className="inline-flex px-4 py-2 rounded-lg text-sm font-medium text-white"
-            style={{ background: '#8B3A2A' }}>
+            style={{ background: '#46DA26' }}>
             Add contract
           </Link>
         </div>
@@ -330,7 +357,7 @@ export default function ScheduleGeneratorPage() {
           <p className="text-xs text-amber-600 mb-4">Set up the rota calendar before generating schedules.</p>
           <Link href="/admin/calendar"
             className="inline-flex px-4 py-2 rounded-lg text-sm font-medium text-white"
-            style={{ background: '#8B3A2A' }}>
+            style={{ background: '#46DA26' }}>
             Go to calendar
           </Link>
         </div>
@@ -338,10 +365,15 @@ export default function ScheduleGeneratorPage() {
     )
   }
 
-  const confirmedCount = preview?.filter(v => !v.isBankHoliday).length ?? 0
-  const bankedCount    = preview?.filter(v => v.isBankHoliday).length ?? 0
+  const freq         = contract.frequency
+  const isManual     = freq === 'termly' || freq === 'custom'
+  const showDayPick  = !isManual && freq !== 'three_times_weekly'
+  const showSlotPick = !isManual && freq !== 'twice_weekly' && freq !== 'three_times_weekly'
+  const needsTags    = !tagsConfigured()
+
+  const confirmedCount = preview?.filter(v => !v.conflict).length ?? 0
   const conflictCount  = preview?.filter(v => v.conflict).length ?? 0
-  const suggestions    = FREQUENCY_SUGGESTIONS[contract.frequency] ?? []
+  const adjustedCount  = preview?.filter(v => v.bhAdjusted).length ?? 0
 
   return (
     <div className="max-w-4xl">
@@ -354,6 +386,25 @@ export default function ScheduleGeneratorPage() {
         <h1 className="text-xl font-semibold text-gray-900">Generate schedule</h1>
       </div>
 
+      {needsTags && (
+        <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3">
+          <span className="text-amber-500 text-lg">⚠</span>
+          <div>
+            <p className="text-sm font-medium text-amber-800">Contract tags not configured</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              This contract needs{' '}
+              {contractNeedsFortnightlyTag() ? 'a fortnightly tag (1 or 2)' : ''}
+              {contractNeedsMonthlyTags() ? 'monthly tags' : ''}{' '}
+              set before generating a schedule.
+            </p>
+            <Link href={`/admin/schools/${schoolId}/contracts/${contract.id}/edit`}
+              className="inline-block mt-2 text-xs font-medium text-amber-700 underline">
+              Edit contract →
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-4">
 
         {/* Settings */}
@@ -364,7 +415,7 @@ export default function ScheduleGeneratorPage() {
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-gray-400">Frequency</dt>
-                <dd className="font-medium text-gray-900">{FREQUENCY_LABELS[contract.frequency]}</dd>
+                <dd className="font-medium text-gray-900">{FREQUENCY_LABELS[freq]}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-400">Duration</dt>
@@ -382,6 +433,18 @@ export default function ScheduleGeneratorPage() {
                   {new Date(contract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </dd>
               </div>
+              {contract.fortnightly_tag && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-400">Fortnightly tag</dt>
+                  <dd className="font-medium text-gray-900">{contract.fortnightly_tag}</dd>
+                </div>
+              )}
+              {Array.isArray(contract.monthly_tags) && contract.monthly_tags.length > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-400">Monthly tags</dt>
+                  <dd className="font-medium text-gray-900">{contract.monthly_tags.join(', ')}</dd>
+                </div>
+              )}
             </dl>
           </div>
 
@@ -390,100 +453,93 @@ export default function ScheduleGeneratorPage() {
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Technician</label>
-              <select
-                value={form.technician_id}
-                onChange={e => setForm(p => ({ ...p, technician_id: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              >
-                <option value="">Select...</option>
+              <select value={techId} onChange={e => { setTechId(e.target.value); setPreview(null) }}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                <option value="">Select…</option>
                 {technicians.map(t => (
                   <option key={t.id} value={t.id}>{t.full_name} ({t.initials})</option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Preferred day</label>
-              <select
-                value={form.preferred_day}
-                onChange={e => { setForm(p => ({ ...p, preferred_day: parseInt(e.target.value) })); setPreview(null) }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              >
-                {DAY_OPTIONS.map(d => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Slot</label>
-              <select
-                value={form.preferred_slot}
-                onChange={e => { setForm(p => ({ ...p, preferred_slot: e.target.value })); setPreview(null) }}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              >
-                {SLOT_OPTIONS.map(s => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Rota week selection — single set of buttons */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
-                Visit on rota weeks
-              </label>
-              <div className="flex gap-1.5 mb-2">
-                {[1,2,3,4,5,6].map(w => (
-                  <button
-                    key={w}
-                    onClick={() => toggleRotaWeek(w)}
-                    className="w-8 h-8 rounded-lg text-sm font-bold text-white transition-opacity"
-                    style={{
-                      background: ROTA_COLOURS[w],
-                      opacity:    form.selected_rota_weeks.includes(w) ? 1 : 0.2,
-                    }}
-                    title={`Rota week ${w}`}
-                  >
-                    {w}
-                  </button>
-                ))}
+            {showDayPick && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Preferred day</label>
+                <select value={preferredDay} onChange={e => { setPreferredDay(parseInt(e.target.value)); setPreview(null) }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                  {DAY_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
               </div>
+            )}
 
-              {/* Quick suggestions based on frequency */}
-{/* Quick suggestions based on frequency */}
-{suggestions.length > 0 && (
-  <div className="mb-1">
-    <p className="text-xs text-gray-400 mb-1">Presets for {FREQUENCY_LABELS[contract.frequency].toLowerCase()}:</p>
-    <div className="flex flex-wrap gap-1">
-      {suggestions.map((s, i) => (
-        <button
-          key={i}
-          onClick={() => { setForm(p => ({ ...p, selected_rota_weeks: s })); setPreview(null) }}
-          className={`text-xs px-2 py-1 rounded-md transition-colors border ${
-            JSON.stringify(form.selected_rota_weeks) === JSON.stringify(s)
-              ? 'border-gray-900 bg-gray-900 text-white'
-              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-          }`}
-        >
-          Weeks {s.join(', ')}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
-
-              <p className="text-xs text-gray-400 mt-1">
-                {form.selected_rota_weeks.length} visit{form.selected_rota_weeks.length !== 1 ? 's' : ''} per 6-week cycle
+            {freq === 'three_times_weekly' && (
+              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                Visits on Monday, Wednesday and Friday each term week.
               </p>
-            </div>
+            )}
+
+            {freq === 'twice_weekly' && (
+              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                Full-day visit every term week.
+              </p>
+            )}
+
+            {showSlotPick && contract.visit_duration === 'half_day' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  {freq === 'one_point_five_weekly' ? 'Alternate week slot' : 'Slot'}
+                </label>
+                <select value={preferredSlot} onChange={e => { setPreferredSlot(e.target.value); setPreview(null) }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                  {SLOT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+                {freq === 'one_point_five_weekly' && (
+                  <p className="text-xs text-gray-400 mt-1">Fortnightly weeks will be full day.</p>
+                )}
+              </div>
+            )}
+
+            {isManual && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">Visit dates</label>
+                <div className="space-y-2">
+                  {manualDates.map((d, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input type="date" value={d}
+                        onChange={e => {
+                          const next = [...manualDates]
+                          next[i] = e.target.value
+                          setManualDates(next)
+                          setPreview(null)
+                        }}
+                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                      {manualDates.length > 1 && (
+                        <button onClick={() => { setManualDates(manualDates.filter((_, j) => j !== i)); setPreview(null) }}
+                          className="text-gray-300 hover:text-gray-600 text-lg leading-none">×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setManualDates([...manualDates, ''])}
+                  className="mt-2 text-xs text-gray-400 hover:text-gray-700">+ Add date</button>
+
+                {contract.visit_duration === 'half_day' && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Slot</label>
+                    <select value={preferredSlot} onChange={e => { setPreferredSlot(e.target.value); setPreview(null) }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                      {SLOT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               onClick={generatePreview}
-              disabled={!form.technician_id || form.selected_rota_weeks.length === 0}
+              disabled={!techId || (needsTags && !isManual)}
               className="w-full py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40"
-              style={{ background: '#8B3A2A' }}
-            >
+              style={{ background: '#46DA26' }}>
               Preview schedule
             </button>
           </div>
@@ -499,15 +555,15 @@ export default function ScheduleGeneratorPage() {
           ) : (
             <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
 
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold text-gray-900">{preview.length} visits</span>
                   <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                     {confirmedCount} confirmed
                   </span>
-                  {bankedCount > 0 && (
-                    <span className="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
-                      {bankedCount} to bank
+                  {adjustedCount > 0 && (
+                    <span className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                      {adjustedCount} BH adjusted
                     </span>
                   )}
                   {conflictCount > 0 && (
@@ -518,53 +574,44 @@ export default function ScheduleGeneratorPage() {
                 </div>
                 <button
                   onClick={handleConfirm}
-                  disabled={saving}
+                  disabled={saving || preview.length === 0}
                   className="px-4 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-                  style={{ background: '#8B3A2A' }}
-                >
+                  style={{ background: '#46DA26' }}>
                   {saving ? 'Saving…' : 'Confirm & save all'}
                 </button>
               </div>
 
               <div className="divide-y divide-gray-50 max-h-[560px] overflow-auto">
-                {preview.map((visit, i) => (
+                {preview.map((v, i) => (
                   <div key={i}
                     className={`flex items-center gap-3 px-4 py-2.5 text-sm ${
-                      visit.isBankHoliday ? 'bg-purple-50/40 opacity-70' :
-                      visit.conflict      ? 'bg-amber-50' : ''
-                    }`}
-                  >
-                    <span className="text-gray-300 w-5 text-xs text-right">{i + 1}</span>
-
-                    <span className="font-medium text-gray-900 w-20">
-                      {new Date(visit.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                    </span>
-
-                    <span className="text-gray-400 w-7 text-xs">{visit.day}</span>
-
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-14 text-center ${
-                      visit.slot === 'am'       ? 'bg-blue-50 text-blue-700' :
-                      visit.slot === 'pm'       ? 'bg-orange-50 text-orange-700' :
-                                                  'bg-gray-100 text-gray-600'
+                      v.conflict ? 'bg-amber-50' : v.bhAdjusted ? 'bg-blue-50/40' : ''
                     }`}>
-                      {visit.slot === 'full_day' ? 'Full' : visit.slot.toUpperCase()}
+                    <span className="text-gray-300 w-5 text-xs text-right shrink-0">{i + 1}</span>
+
+                    <span className="font-medium text-gray-900 w-20 shrink-0">
+                      {new Date(v.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </span>
 
-                    <span
-                      className="inline-flex w-5 h-5 items-center justify-center rounded-full text-white font-bold text-xs shrink-0"
-                      style={{ background: ROTA_COLOURS[visit.rotaWeek] }}
-                      title={`Rota week ${visit.rotaWeek}`}
-                    >
-                      {visit.rotaWeek}
+                    <span className="text-gray-400 text-xs w-7 shrink-0">
+                      {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(v.date + 'T12:00:00').getDay()]}
                     </span>
 
-                    <span className="text-gray-500 text-xs flex-1">{visit.term}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-14 text-center shrink-0 ${
+                      v.slot === 'am'       ? 'bg-blue-50 text-blue-700' :
+                      v.slot === 'pm'       ? 'bg-orange-50 text-orange-700' :
+                                              'bg-gray-100 text-gray-600'
+                    }`}>
+                      {v.slot === 'full_day' ? 'Full' : v.slot.toUpperCase()}
+                    </span>
 
-                    {visit.isBankHoliday && (
-                      <span className="text-xs text-purple-500 shrink-0">banked</span>
+                    <span className="text-gray-500 text-xs flex-1 truncate">{v.termName}</span>
+
+                    {v.bhAdjusted && (
+                      <span className="text-xs text-blue-500 shrink-0">BH → Tue</span>
                     )}
-                    {visit.conflict && (
-                      <span className="text-xs text-amber-600 font-medium shrink-0">⚠ conflict</span>
+                    {v.conflict && (
+                      <span className="text-xs text-amber-600 font-medium shrink-0">⚠ clash</span>
                     )}
                   </div>
                 ))}
