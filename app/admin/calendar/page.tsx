@@ -468,62 +468,38 @@ export default function CalendarPage() {
           </div>
 
           {/* Frequency highlight controls */}
-          <div className="flex items-center gap-3 mb-3 flex-wrap">
-            <span className="text-xs text-gray-500">Highlight:</span>
-            <div className="flex gap-1 flex-wrap">
-              {[
-                { value: '',                    label: 'None' },
-                { value: 'weekly',              label: 'Weekly' },
-                { value: 'twice_weekly',        label: '2× Weekly' },
-                { value: 'three_times_weekly',  label: '3× Weekly' },
-                { value: 'fortnightly',         label: 'Fortnightly' },
-                { value: 'one_point_five_weekly', label: '1.5×' },
-                { value: 'monthly',             label: 'Monthly' },
-                { value: 'three_weekly',        label: '3-weekly' },
-                { value: 'half_termly',         label: 'Half-termly' },
-              ].map(opt => (
-                <button key={opt.value}
-                  onClick={() => { setHighlightFreq(opt.value); setHighlightGroup('') }}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
-                    highlightFreq === opt.value
-                      ? 'border-gray-900 bg-gray-900 text-white'
-                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {(highlightFreq === 'fortnightly' || highlightFreq === 'one_point_five_weekly') && (
-              <div className="flex gap-1">
-                {['', '1', '2'].map(g => (
-                  <button key={g}
-                    onClick={() => setHighlightGroup(g)}
-                    className={`px-2 py-1 rounded-md text-xs font-medium border transition-colors ${
-                      highlightGroup === g
-                        ? 'border-gray-900 bg-gray-900 text-white'
-                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                    }`}>
-                    {g === '' ? 'Both' : `Group ${g}`}
-                  </button>
-                ))}
+          {(() => {
+            const opts: { value: string; group: string; label: string; colour: string }[] = [
+              { value: '',            group: '',  label: 'None',            colour: '' },
+              { value: 'weekly',      group: '',  label: 'Weekly',          colour: '#46DA26' },
+              { value: 'fortnightly', group: '1', label: 'Fortnightly W1',  colour: '#C0392B' },
+              { value: 'fortnightly', group: '2', label: 'Fortnightly W2',  colour: '#1A6FA8' },
+              { value: 'monthly',     group: '1', label: 'Monthly 1',       colour: '#C0392B' },
+              { value: 'monthly',     group: '2', label: 'Monthly 2',       colour: '#1A6FA8' },
+              { value: 'monthly',     group: '3', label: 'Monthly 3',       colour: '#3D6B5E' },
+              { value: 'monthly',     group: '4', label: 'Monthly 4',       colour: '#7A5C2E' },
+              { value: 'monthly',     group: '5', label: 'Monthly 5',       colour: '#6B3A7A' },
+              { value: 'monthly',     group: '6', label: 'Monthly 6',       colour: '#2C6E8A' },
+            ]
+            return (
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-xs text-gray-400 shrink-0">Highlight:</span>
+                {opts.map((opt, i) => {
+                  const isActive = highlightFreq === opt.value && highlightGroup === opt.group
+                  return (
+                    <button key={i}
+                      onClick={() => { setHighlightFreq(opt.value); setHighlightGroup(opt.group) }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                        isActive ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                      style={isActive && opt.colour ? { background: opt.colour, borderColor: opt.colour } : {}}>
+                      {opt.label}
+                    </button>
+                  )
+                })}
               </div>
-            )}
-            {(highlightFreq === 'monthly' || highlightFreq === 'three_weekly' || highlightFreq === 'half_termly') && (
-              <div className="flex gap-1">
-                {['', '1', '2', '3', '4', '5', '6'].map(g => (
-                  <button key={g}
-                    onClick={() => setHighlightGroup(g)}
-                    className={`px-2 py-1 rounded-md text-xs font-medium border transition-colors ${
-                      highlightGroup === g
-                        ? 'border-gray-900 bg-gray-900 text-white'
-                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                    }`}>
-                    {g === '' ? 'All' : g}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            )
+          })()}
 
           {/* Calendar grid */}
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -537,48 +513,29 @@ export default function CalendarPage() {
               const isHolidayWeek = !week.slice(0, 5).some(d => d.isInTerm)
               const rota          = rotaCalendar.find(r => r.week_start === week[0].weekStart)
 
-              // Determine highlight colour for this week
+              // Determine highlight colour for this week based on selected freq+group
               let highlightColour: string | null = null
               if (highlightFreq && rota && !isHolidayWeek) {
-                const FREQ_COLOURS: Record<string, string> = {
-                  weekly:                 '#46DA26',
-                  twice_weekly:           '#1A6FA8',
-                  three_times_weekly:     '#3D6B5E',
-                  fortnightly:            '#C0392B',
-                  one_point_five_weekly:  '#7A5C2E',
-                  monthly:                '#6B3A7A',
-                  three_weekly:           '#2C6E8A',
-                  half_termly:            '#B45309',
-                }
-                const FORTNIGHTLY_COLOURS: Record<number, string> = { 1: '#C0392B', 2: '#1A6FA8' }
                 const MONTHLY_COLOURS: Record<number, string> = {
                   1: '#C0392B', 2: '#1A6FA8', 3: '#3D6B5E', 4: '#7A5C2E', 5: '#6B3A7A', 6: '#2C6E8A',
                 }
-
-                if ((highlightFreq === 'weekly' || highlightFreq === 'twice_weekly' || highlightFreq === 'three_times_weekly') && rota.tag_weekly) {
-                  highlightColour = FREQ_COLOURS[highlightFreq]
+                if (highlightFreq === 'weekly' && rota.tag_weekly) {
+                  highlightColour = '#46DA26'
                 } else if (highlightFreq === 'fortnightly' && rota.tag_fortnightly) {
                   if (!highlightGroup || highlightGroup === String(rota.tag_fortnightly)) {
-                    highlightColour = FORTNIGHTLY_COLOURS[rota.tag_fortnightly] ?? FREQ_COLOURS.fortnightly
+                    highlightColour = rota.tag_fortnightly === 1 ? '#C0392B' : '#1A6FA8'
                   }
-                } else if (highlightFreq === 'one_point_five_weekly' && rota.tag_fortnightly) {
-                  if (!highlightGroup || highlightGroup === String(rota.tag_fortnightly)) {
-                    highlightColour = FORTNIGHTLY_COLOURS[rota.tag_fortnightly] ?? FREQ_COLOURS.one_point_five_weekly
-                  }
-                } else if ((highlightFreq === 'monthly' || highlightFreq === 'three_weekly' || highlightFreq === 'half_termly') && rota.tag_monthly) {
+                } else if (highlightFreq === 'monthly' && rota.tag_monthly) {
                   if (!highlightGroup || highlightGroup === String(rota.tag_monthly)) {
-                    highlightColour = MONTHLY_COLOURS[rota.tag_monthly] ?? FREQ_COLOURS.monthly
+                    highlightColour = MONTHLY_COLOURS[rota.tag_monthly] ?? '#6B3A7A'
                   }
                 }
               }
 
               return (
-                <div key={wi} className={`grid grid-cols-7 border-b border-gray-50 last:border-b-0 relative ${
-                  isHolidayWeek ? 'bg-gray-50/60' : ''
-                }`} style={highlightColour ? { borderLeft: `3px solid ${highlightColour}` } : {}}>
-                  {highlightColour && (
-                    <div className="absolute left-0 inset-y-0 w-0.5" style={{ background: highlightColour }} />
-                  )}
+                <div key={wi}
+                  className={`grid grid-cols-7 border-b border-gray-50 last:border-b-0 ${isHolidayWeek ? 'bg-gray-50/60' : ''}`}
+                  style={highlightColour ? { background: highlightColour + '1a', borderLeft: `4px solid ${highlightColour}` } : {}}>
 
                   {week.map((day, di) => {
                     const isToday  = day.dateStr === toStr(today)
@@ -786,68 +743,113 @@ export default function CalendarPage() {
           )}
 
           {(() => {
-            const rows = rotaCalendar.filter(r => {
-              const year = new Date(r.week_start + 'T12:00:00').getFullYear()
-              return year === tagsYear
-            })
-            if (rows.length === 0) {
-              return <p className="text-sm text-gray-400 text-center py-4">No rota weeks for {tagsYear}</p>
+            // Build a list of ALL Mondays in tagsYear
+            const allWeeks: string[] = []
+            const jan1 = new Date(tagsYear, 0, 1)
+            // Find first Monday of or before Jan 1
+            let cur = new Date(jan1)
+            const dow = cur.getDay()
+            cur.setDate(cur.getDate() - (dow === 0 ? 6 : dow - 1))
+            const dec31 = new Date(tagsYear, 11, 31)
+            while (cur <= dec31) {
+              if (cur.getFullYear() >= tagsYear || cur >= jan1) {
+                const ws = toStr(cur)
+                // include if any day of the week falls in this year
+                const fri = new Date(cur); fri.setDate(fri.getDate() + 4)
+                if (cur.getFullYear() === tagsYear || fri.getFullYear() === tagsYear) {
+                  allWeeks.push(ws)
+                }
+              }
+              cur = addDays(cur, 7)
             }
+
+            if (allWeeks.length === 0) {
+              return <p className="text-sm text-gray-400 text-center py-4">No weeks for {tagsYear}</p>
+            }
+
             return (
-              <div className="overflow-auto">
+              <div className="overflow-auto max-h-[600px]">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 bg-white">
                     <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
                       <th className="text-left pb-2 pr-4">Week commencing</th>
+                      <th className="text-left pb-2 pr-4">Term</th>
                       <th className="text-left pb-2 pr-4">Weekly</th>
                       <th className="text-left pb-2 pr-4">Fortnightly</th>
                       <th className="text-left pb-2">Monthly</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r, i) => {
-                      const isSaving = savingTagId === r.id
-                      const bg = i % 2 === 0 ? '#ffffff' : '#f0fdf8'
+                    {allWeeks.map((ws, i) => {
+                      const rota = rotaCalendar.find(r => r.week_start === ws)
+                      const termName = getTermName(ws)
+                      // check if any weekday (Mon–Fri) is in term
+                      const isTermWeek = Array.from({ length: 5 }, (_, d) => {
+                        const dd = new Date(ws + 'T12:00:00'); dd.setDate(dd.getDate() + d); return toStr(dd)
+                      }).some(ds => termDates.some(t => ds >= t.start_date && ds <= t.end_date))
+
+                      const isSaving = rota ? savingTagId === rota.id : false
+                      const bg = !isTermWeek ? '#f8fafc' : (i % 2 === 0 ? '#ffffff' : '#f0fdf8')
+
                       return (
-                        <tr key={r.id} style={{ background: bg }}>
+                        <tr key={ws} style={{ background: bg }} className={!isTermWeek ? 'opacity-60' : ''}>
                           <td className="py-1.5 pr-4 text-gray-700">
-                            {new Date(r.week_start + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {new Date(ws + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </td>
                           <td className="py-1.5 pr-4">
-                            <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: '#46DA26' }}>
-                                <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
+                            {isTermWeek ? (
+                              <span className="text-xs text-green-700 font-medium">{termName ?? 'Term'}</span>
+                            ) : (
+                              <span className="text-xs text-gray-400">Holiday</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 pr-4">
+                            {isTermWeek ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                                <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: '#46DA26' }}>
+                                  <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </span>
+                                Always
                               </span>
-                              Always
-                            </span>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="py-1.5 pr-4">
-                            <select
-                              value={r.tag_fortnightly ?? ''}
-                              disabled={isSaving}
-                              onChange={e => saveRotaTag(r.id, 'tag_fortnightly', e.target.value ? parseInt(e.target.value) : null)}
-                              className="px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 bg-white"
-                            >
-                              <option value="">—</option>
-                              <option value="1">1</option>
-                              <option value="2">2</option>
-                            </select>
+                            {rota && isTermWeek ? (
+                              <select
+                                value={rota.tag_fortnightly ?? ''}
+                                disabled={isSaving}
+                                onChange={e => saveRotaTag(rota.id, 'tag_fortnightly', e.target.value ? parseInt(e.target.value) : null)}
+                                className="px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 bg-white"
+                              >
+                                <option value="">—</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                              </select>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="py-1.5">
-                            <select
-                              value={r.tag_monthly ?? 0}
-                              disabled={isSaving}
-                              onChange={e => saveRotaTag(r.id, 'tag_monthly', parseInt(e.target.value))}
-                              className="px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 bg-white"
-                            >
-                              <option value="0">0 (none)</option>
-                              {[1,2,3,4,5,6].map(n => (
-                                <option key={n} value={n}>{n}</option>
-                              ))}
-                            </select>
-                            {isSaving && <span className="ml-2 text-xs text-gray-400">Saving…</span>}
+                            {rota && isTermWeek ? (
+                              <>
+                                <select
+                                  value={rota.tag_monthly ?? 0}
+                                  disabled={isSaving}
+                                  onChange={e => saveRotaTag(rota.id, 'tag_monthly', parseInt(e.target.value))}
+                                  className="px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 bg-white"
+                                >
+                                  <option value="0">0 (none)</option>
+                                  {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                                {isSaving && <span className="ml-2 text-xs text-gray-400">Saving…</span>}
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
                           </td>
                         </tr>
                       )
