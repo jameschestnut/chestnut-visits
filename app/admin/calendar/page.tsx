@@ -35,6 +35,9 @@ interface RotaWeek {
   week_start: string
   rota_week: number
   is_override: boolean
+  tag_weekly: boolean | null
+  tag_fortnightly: number | null
+  tag_monthly: number | null
 }
 
 interface DayInfo {
@@ -50,11 +53,14 @@ interface DayInfo {
   weekStart: string
 }
 
+type Tab = 'calendar' | 'terms' | 'holidays' | 'tags'
+
 export default function CalendarPage() {
   const supabase = createClient()
 
   const today = new Date()
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const [activeTab, setActiveTab] = useState<Tab>('calendar')
 
   const [termDates, setTermDates]       = useState<TermDate[]>([])
   const [bankHolidays, setBankHolidays] = useState<BankHoliday[]>([])
@@ -76,10 +82,15 @@ export default function CalendarPage() {
   const [editingHoliday, setEditingHoliday] = useState<{ id?: string; holiday_date: string; name: string } | null>(null)
   const [savingHoliday, setSavingHoliday]   = useState(false)
 
-  // Year filters for term/holiday lists
+  // Year filters
   const currentYear = new Date().getFullYear()
   const [termYear, setTermYear]       = useState(currentYear)
   const [holidayYear, setHolidayYear] = useState(currentYear)
+  const [tagsYear, setTagsYear]       = useState(currentYear)
+
+  // Rota tag saving state
+  const [savingTagId, setSavingTagId] = useState<string | null>(null)
+  const [tagWarning, setTagWarning]   = useState<string | null>(null)
 
   // Setup modal
   const [showSetup, setShowSetup]           = useState(false)
@@ -338,6 +349,45 @@ export default function CalendarPage() {
     window.location.reload()
   }
 
+  // ── Rota tag helpers ───────────────────────────────────────────────────────
+
+  function validateTags(fortnightly: number | null, monthly: number | null): string | null {
+    if (!monthly || monthly === 0) return null
+    if (!fortnightly) return 'Set the fortnightly tag before setting a monthly tag.'
+    const oddMonthly  = [1, 3, 5]
+    const evenMonthly = [2, 4, 6]
+    if (oddMonthly.includes(monthly) && fortnightly !== 1) {
+      return `Monthly tag ${monthly} must be on a fortnightly-1 week.`
+    }
+    if (evenMonthly.includes(monthly) && fortnightly !== 2) {
+      return `Monthly tag ${monthly} must be on a fortnightly-2 week.`
+    }
+    return null
+  }
+
+  async function saveRotaTag(id: string, field: 'tag_fortnightly' | 'tag_monthly', value: number | null) {
+    setSavingTagId(id)
+    setTagWarning(null)
+
+    const week = rotaCalendar.find(r => r.id === id)
+    if (!week) { setSavingTagId(null); return }
+
+    const newFortnightly = field === 'tag_fortnightly' ? value : week.tag_fortnightly
+    const newMonthly     = field === 'tag_monthly'     ? value : week.tag_monthly
+
+    const warning = validateTags(newFortnightly, newMonthly)
+    if (warning) {
+      setTagWarning(warning)
+      setSavingTagId(null)
+      return
+    }
+
+    await supabase.from('rota_calendar').update({ [field]: value }).eq('id', id)
+
+    setRotaCalendar(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
+    setSavingTagId(null)
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (!loaded) {
@@ -350,6 +400,13 @@ export default function CalendarPage() {
 
   const grid    = buildGrid()
   const hasRota = rotaCalendar.length > 0
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'calendar',  label: 'Calendar' },
+    { key: 'terms',     label: 'Term dates' },
+    { key: 'holidays',  label: 'Bank holidays' },
+    { key: 'tags',      label: 'Rota tags' },
+  ]
 
   return (
     <div className="max-w-4xl">
@@ -376,247 +433,370 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Month nav */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-          className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50"
-        >‹</button>
-        <h2 className="text-sm font-semibold text-gray-900">
-          {MONTH_NAMES[viewDate.getMonth()]} {viewDate.getFullYear()}
-        </h2>
-        <button
-          onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-          className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50"
-        >›</button>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
+        {TABS.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Calendar grid */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      {/* ── Calendar tab ── */}
+      {activeTab === 'calendar' && (
+        <>
+          {/* Month nav */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+              className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50"
+            >‹</button>
+            <h2 className="text-sm font-semibold text-gray-900">
+              {MONTH_NAMES[viewDate.getMonth()]} {viewDate.getFullYear()}
+            </h2>
+            <button
+              onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+              className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50"
+            >›</button>
+          </div>
 
-        {/* Column headers */}
-        <div className="grid grid-cols-8 border-b border-gray-100 bg-gray-50">
-          <div className="px-3 py-2 text-xs font-medium text-gray-400 text-center">Rota</div>
-          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
-            <div key={d} className="px-3 py-2 text-xs font-medium text-gray-400 text-center">{d}</div>
-          ))}
-        </div>
+          {/* Calendar grid */}
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="grid grid-cols-8 border-b border-gray-100 bg-gray-50">
+              <div className="px-3 py-2 text-xs font-medium text-gray-400 text-center">Rota</div>
+              {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+                <div key={d} className="px-3 py-2 text-xs font-medium text-gray-400 text-center">{d}</div>
+              ))}
+            </div>
 
-        {/* Week rows */}
-        {grid.map((week, wi) => {
-          const rota          = week[0].rotaWeek
-          const isHolidayWeek = !week.slice(0, 5).some(d => d.isInTerm)
-          const rotaColour    = rota ? ROTA_COLOURS[rota] : '#94a3b8'
+            {grid.map((week, wi) => {
+              const rota          = week[0].rotaWeek
+              const isHolidayWeek = !week.slice(0, 5).some(d => d.isInTerm)
+              const rotaColour    = rota ? ROTA_COLOURS[rota] : '#94a3b8'
 
-          return (
-            <div key={wi} className={`grid grid-cols-8 border-b border-gray-50 last:border-b-0 ${
-              isHolidayWeek ? 'bg-gray-50/60' : ''
-            }`}>
-
-              {/* Rota badge */}
-              <div className="flex items-center justify-center px-2 py-2 border-r border-gray-50">
-                {rota && !isHolidayWeek ? (
-                  <button
-                    onClick={() => { setOverrideWeek(week[0].weekStart); setOverrideValue(rota) }}
-                    className="w-7 h-7 rounded-full text-xs font-bold text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                    style={{
-                      background:  rotaColour,
-                      boxShadow:   week[0].isRotaOverride ? `0 0 0 2px white, 0 0 0 3px ${rotaColour}` : 'none',
-                    }}
-                    title={`Rota week ${rota}${week[0].isRotaOverride ? ' (override)' : ''} — click to change`}
-                  >
-                    {rota}
-                  </button>
-                ) : (
-                  <span className="text-xs text-gray-300">—</span>
-                )}
-              </div>
-
-              {/* Day cells */}
-              {week.map((day, di) => {
-                const isToday  = day.dateStr === toStr(today)
-                const canClick = !day.isWeekend && !day.bankHoliday && day.isCurrentMonth
-
-                return (
-                  <div
-                    key={di}
-                    onClick={() => {
-                      if (canClick) {
-                        setAddingException(day.dateStr)
-                        setExceptionName('')
-                      }
-                    }}
-                    className={`min-h-[60px] px-2 py-1.5 border-r border-gray-50 last:border-r-0 ${
-                      !day.isCurrentMonth ? 'opacity-25' :
-                      day.isWeekend      ? 'bg-gray-50/50' : ''
-                    } ${canClick ? 'cursor-pointer hover:bg-blue-50/30' : ''}`}
-                  >
-                    {/* Date number */}
-                    <div className="mb-0.5">
-                      <span className={`inline-flex w-5 h-5 items-center justify-center rounded-full text-xs font-medium ${
-                        isToday         ? 'bg-gray-900 text-white' :
-                        day.isWeekend   ? 'text-gray-300' :
-                        day.isInTerm    ? 'text-gray-800' :
-                                          'text-gray-400'
-                      }`}>
-                        {day.date.getDate()}
-                      </span>
-                    </div>
-
-                    {/* Term label on first day of term */}
-                    {(() => {
-                      const termStart = termDates.find(t => t.term_name === day.termName)?.start_date
-                      if (day.termName && day.dateStr === termStart) {
-                        return (
-                          <div className="text-xs font-semibold truncate leading-tight" style={{ color: rotaColour }}>
-                            {day.termName}
-                          </div>
-                        )
-                      }
-                      return null
-                    })()}
-
-                    {/* Bank holiday / closure */}
-                    {day.bankHoliday && (
-                      <div className="mt-0.5 flex items-start gap-0.5">
-                        <span className="flex-1 text-xs bg-red-50 text-red-600 px-1 py-0.5 rounded leading-tight truncate">
-                          {day.bankHoliday.name}
-                        </span>
-                        <button
-                          onClick={e => { e.stopPropagation(); removeException(day.bankHoliday!.id) }}
-                          className="text-red-300 hover:text-red-500 text-xs leading-tight shrink-0"
-                        >×</button>
-                      </div>
+              return (
+                <div key={wi} className={`grid grid-cols-8 border-b border-gray-50 last:border-b-0 ${
+                  isHolidayWeek ? 'bg-gray-50/60' : ''
+                }`}>
+                  <div className="flex items-center justify-center px-2 py-2 border-r border-gray-50">
+                    {rota && !isHolidayWeek ? (
+                      <button
+                        onClick={() => { setOverrideWeek(week[0].weekStart); setOverrideValue(rota) }}
+                        className="w-7 h-7 rounded-full text-xs font-bold text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                        style={{
+                          background:  rotaColour,
+                          boxShadow:   week[0].isRotaOverride ? `0 0 0 2px white, 0 0 0 3px ${rotaColour}` : 'none',
+                        }}
+                        title={`Rota week ${rota}${week[0].isRotaOverride ? ' (override)' : ''} — click to change`}
+                      >
+                        {rota}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
                     )}
                   </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 px-1">
-        {[1,2,3,4,5,6].map(w => (
-          <div key={w} className="flex items-center gap-1.5 text-xs text-gray-500">
-            <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-bold"
-              style={{ background: ROTA_COLOURS[w] }}>{w}</div>
-            W{w}
-          </div>
-        ))}
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <div className="w-4 h-4 rounded bg-gray-100 border border-gray-200" /> Holiday
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <div className="w-4 h-4 rounded bg-red-50 border border-red-100" /> Closure
-        </div>
-        <div className="text-xs text-gray-400">Click any school day to add a closure</div>
-      </div>
+                  {week.map((day, di) => {
+                    const isToday  = day.dateStr === toStr(today)
+                    const canClick = !day.isWeekend && !day.bankHoliday && day.isCurrentMonth
 
-      {/* Term dates */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-gray-700">Term dates</h2>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setTermYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
-              <span className="text-xs font-medium text-gray-600 w-10 text-center">{termYear}</span>
-              <button onClick={() => setTermYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
-            </div>
+                    return (
+                      <div
+                        key={di}
+                        onClick={() => {
+                          if (canClick) {
+                            setAddingException(day.dateStr)
+                            setExceptionName('')
+                          }
+                        }}
+                        className={`min-h-[60px] px-2 py-1.5 border-r border-gray-50 last:border-r-0 ${
+                          !day.isCurrentMonth ? 'opacity-25' :
+                          day.isWeekend      ? 'bg-gray-50/50' : ''
+                        } ${canClick ? 'cursor-pointer hover:bg-blue-50/30' : ''}`}
+                      >
+                        <div className="mb-0.5">
+                          <span className={`inline-flex w-5 h-5 items-center justify-center rounded-full text-xs font-medium ${
+                            isToday         ? 'bg-gray-900 text-white' :
+                            day.isWeekend   ? 'text-gray-300' :
+                            day.isInTerm    ? 'text-gray-800' :
+                                              'text-gray-400'
+                          }`}>
+                            {day.date.getDate()}
+                          </span>
+                        </div>
+
+                        {(() => {
+                          const termStart = termDates.find(t => t.term_name === day.termName)?.start_date
+                          if (day.termName && day.dateStr === termStart) {
+                            return (
+                              <div className="text-xs font-semibold truncate leading-tight" style={{ color: rotaColour }}>
+                                {day.termName}
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+
+                        {day.bankHoliday && (
+                          <div className="mt-0.5 flex items-start gap-0.5">
+                            <span className="flex-1 text-xs bg-red-50 text-red-600 px-1 py-0.5 rounded leading-tight truncate">
+                              {day.bankHoliday.name}
+                            </span>
+                            <button
+                              onClick={e => { e.stopPropagation(); removeException(day.bankHoliday!.id) }}
+                              className="text-red-300 hover:text-red-500 text-xs leading-tight shrink-0"
+                            >×</button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
-          <button onClick={() => setEditingTerm({ term_name: '', start_date: '', end_date: '' })}
-            className="text-xs text-gray-400 hover:text-gray-700">
-            + Add term
-          </button>
-        </div>
-        {(() => {
-          const rows = [...termDates]
-            .filter(t => parseInt(t.start_date.substring(0, 4)) === termYear)
-            .sort((a, b) => a.start_date.localeCompare(b.start_date))
-          return rows.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">No terms for {termYear}</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
-                  <th className="text-left pb-2">Term</th>
-                  <th className="text-left pb-2">Start</th>
-                  <th className="text-left pb-2">End</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(t => (
-                  <tr key={t.id} className="border-b border-gray-50 last:border-b-0">
-                    <td className="py-2 font-medium text-gray-800">{t.term_name}</td>
-                    <td className="py-2 text-gray-500">{new Date(t.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                    <td className="py-2 text-gray-500">{new Date(t.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => setEditingTerm({ id: t.id, term_name: t.term_name, start_date: t.start_date, end_date: t.end_date })}
-                        className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
-                      <button onClick={() => deleteTerm(t.id)}
-                        className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                    </td>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 px-1">
+            {[1,2,3,4,5,6].map(w => (
+              <div key={w} className="flex items-center gap-1.5 text-xs text-gray-500">
+                <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  style={{ background: ROTA_COLOURS[w] }}>{w}</div>
+                W{w}
+              </div>
+            ))}
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-4 h-4 rounded bg-gray-100 border border-gray-200" /> Holiday
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-4 h-4 rounded bg-red-50 border border-red-100" /> Closure
+            </div>
+            <div className="text-xs text-gray-400">Click any school day to add a closure</div>
+          </div>
+        </>
+      )}
+
+      {/* ── Term dates tab ── */}
+      {activeTab === 'terms' && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-gray-700">Term dates</h2>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setTermYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
+                <span className="text-xs font-medium text-gray-600 w-10 text-center">{termYear}</span>
+                <button onClick={() => setTermYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
+              </div>
+            </div>
+            <button onClick={() => setEditingTerm({ term_name: '', start_date: '', end_date: '' })}
+              className="text-xs text-gray-400 hover:text-gray-700">
+              + Add term
+            </button>
+          </div>
+          {(() => {
+            const rows = [...termDates]
+              .filter(t => parseInt(t.start_date.substring(0, 4)) === termYear)
+              .sort((a, b) => a.start_date.localeCompare(b.start_date))
+            return rows.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No terms for {termYear}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                    <th className="text-left pb-2">Term</th>
+                    <th className="text-left pb-2">Start</th>
+                    <th className="text-left pb-2">End</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        })()}
-      </div>
-
-      {/* Bank holidays */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mt-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-gray-700">Bank holidays &amp; closures</h2>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setHolidayYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
-              <span className="text-xs font-medium text-gray-600 w-10 text-center">{holidayYear}</span>
-              <button onClick={() => setHolidayYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
-            </div>
-          </div>
-          <button onClick={() => setEditingHoliday({ holiday_date: '', name: '' })}
-            className="text-xs text-gray-400 hover:text-gray-700">
-            + Add
-          </button>
+                </thead>
+                <tbody>
+                  {rows.map(t => (
+                    <tr key={t.id} className="border-b border-gray-50 last:border-b-0">
+                      <td className="py-2 font-medium text-gray-800">{t.term_name}</td>
+                      <td className="py-2 text-gray-500">{new Date(t.start_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td className="py-2 text-gray-500">{new Date(t.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td className="py-2 text-right">
+                        <button onClick={() => setEditingTerm({ id: t.id, term_name: t.term_name, start_date: t.start_date, end_date: t.end_date })}
+                          className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
+                        <button onClick={() => deleteTerm(t.id)}
+                          className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          })()}
         </div>
-        {(() => {
-          const rows = [...bankHolidays]
-            .filter(h => parseInt(h.holiday_date.substring(0, 4)) === holidayYear)
-            .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date))
-          return rows.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">No bank holidays for {holidayYear}</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
-                  <th className="text-left pb-2">Date</th>
-                  <th className="text-left pb-2">Name</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(h => (
-                  <tr key={h.id} className="border-b border-gray-50 last:border-b-0">
-                    <td className="py-2 text-gray-500 w-40">{new Date(h.holiday_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                    <td className="py-2 text-gray-800">{h.name}</td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => setEditingHoliday({ id: h.id, holiday_date: h.holiday_date, name: h.name })}
-                        className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
-                      <button onClick={() => deleteHoliday(h.id)}
-                        className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        })()}
-      </div>
+      )}
 
-      {/* Add closure modal */}
+      {/* ── Bank holidays tab ── */}
+      {activeTab === 'holidays' && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-gray-700">Bank holidays &amp; closures</h2>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setHolidayYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
+                <span className="text-xs font-medium text-gray-600 w-10 text-center">{holidayYear}</span>
+                <button onClick={() => setHolidayYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
+              </div>
+            </div>
+            <button onClick={() => setEditingHoliday({ holiday_date: '', name: '' })}
+              className="text-xs text-gray-400 hover:text-gray-700">
+              + Add
+            </button>
+          </div>
+          {(() => {
+            const rows = [...bankHolidays]
+              .filter(h => parseInt(h.holiday_date.substring(0, 4)) === holidayYear)
+              .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date))
+            return rows.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No bank holidays for {holidayYear}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                    <th className="text-left pb-2">Date</th>
+                    <th className="text-left pb-2">Name</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(h => (
+                    <tr key={h.id} className="border-b border-gray-50 last:border-b-0">
+                      <td className="py-2 text-gray-500 w-40">{new Date(h.holiday_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td className="py-2 text-gray-800">{h.name}</td>
+                      <td className="py-2 text-right">
+                        <button onClick={() => setEditingHoliday({ id: h.id, holiday_date: h.holiday_date, name: h.name })}
+                          className="text-xs text-gray-400 hover:text-gray-700 mr-3">Edit</button>
+                        <button onClick={() => deleteHoliday(h.id)}
+                          className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── Rota tags tab ── */}
+      {activeTab === 'tags' && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-gray-700">Rota week tags</h2>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setTagsYear(y => y - 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">‹</button>
+                <span className="text-xs font-medium text-gray-600 w-10 text-center">{tagsYear}</span>
+                <button onClick={() => setTagsYear(y => y + 1)} className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 text-xs">›</button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">Changes auto-save</p>
+          </div>
+
+          <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-4 space-y-0.5">
+            <p>Monthly tags 1, 3, 5 must be on fortnightly-1 weeks · Monthly tags 2, 4, 6 must be on fortnightly-2 weeks · Tag 0 = not a monthly week</p>
+          </div>
+
+          {tagWarning && (
+            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4 text-xs text-amber-700">
+              ⚠ {tagWarning}
+              <button onClick={() => setTagWarning(null)} className="ml-2 underline">Dismiss</button>
+            </div>
+          )}
+
+          {(() => {
+            const rows = rotaCalendar.filter(r => {
+              const year = new Date(r.week_start + 'T12:00:00').getFullYear()
+              return year === tagsYear
+            })
+            if (rows.length === 0) {
+              return <p className="text-sm text-gray-400 text-center py-4">No rota weeks for {tagsYear}</p>
+            }
+            return (
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                      <th className="text-left pb-2 pr-4">Week commencing</th>
+                      <th className="text-left pb-2 pr-4">Rota W</th>
+                      <th className="text-left pb-2 pr-4">Weekly</th>
+                      <th className="text-left pb-2 pr-4">Fortnightly</th>
+                      <th className="text-left pb-2">Monthly</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => {
+                      const isSaving = savingTagId === r.id
+                      const bg = i % 2 === 0 ? '#ffffff' : '#f0fdf8'
+                      return (
+                        <tr key={r.id} style={{ background: bg }}>
+                          <td className="py-1.5 pr-4 text-gray-700">
+                            {new Date(r.week_start + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="py-1.5 pr-4">
+                            <span
+                              className="inline-flex w-6 h-6 items-center justify-center rounded-full text-white text-xs font-bold"
+                              style={{ background: ROTA_COLOURS[r.rota_week] ?? '#94a3b8' }}
+                            >
+                              {r.rota_week}
+                            </span>
+                          </td>
+                          <td className="py-1.5 pr-4">
+                            <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: '#46DA26' }}>
+                                <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </span>
+                              Always
+                            </span>
+                          </td>
+                          <td className="py-1.5 pr-4">
+                            <select
+                              value={r.tag_fortnightly ?? ''}
+                              disabled={isSaving}
+                              onChange={e => saveRotaTag(r.id, 'tag_fortnightly', e.target.value ? parseInt(e.target.value) : null)}
+                              className="px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 bg-white"
+                            >
+                              <option value="">—</option>
+                              <option value="1">1</option>
+                              <option value="2">2</option>
+                            </select>
+                          </td>
+                          <td className="py-1.5">
+                            <select
+                              value={r.tag_monthly ?? 0}
+                              disabled={isSaving}
+                              onChange={e => saveRotaTag(r.id, 'tag_monthly', parseInt(e.target.value))}
+                              className="px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 bg-white"
+                            >
+                              <option value="0">0 (none)</option>
+                              {[1,2,3,4,5,6].map(n => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
+                            {isSaving && <span className="ml-2 text-xs text-gray-400">Saving…</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+
       {addingException && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setAddingException(null)}>
           <div className="absolute inset-0 bg-black/20" />
@@ -642,7 +822,7 @@ export default function CalendarPage() {
             <div className="flex gap-2">
               <button onClick={addException} disabled={saving || !exceptionName.trim()}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-                style={{ background: '#8B3A2A' }}>
+                style={{ background: '#46DA26' }}>
                 {saving ? 'Saving…' : 'Add closure'}
               </button>
               <button onClick={() => setAddingException(null)}
@@ -654,7 +834,6 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Override rota week modal */}
       {overrideWeek && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setOverrideWeek(null)}>
           <div className="absolute inset-0 bg-black/20" />
@@ -675,7 +854,7 @@ export default function CalendarPage() {
             <div className="flex gap-2">
               <button onClick={saveOverride} disabled={saving}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-                style={{ background: '#8B3A2A' }}>
+                style={{ background: '#46DA26' }}>
                 {saving ? 'Saving…' : 'Save'}
               </button>
               <button onClick={() => setOverrideWeek(null)}
@@ -687,7 +866,6 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Bank holiday edit modal */}
       {editingHoliday && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setEditingHoliday(null)}>
           <div className="absolute inset-0 bg-black/20" />
@@ -725,7 +903,6 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Term edit modal */}
       {editingTerm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setEditingTerm(null)}>
           <div className="absolute inset-0 bg-black/20" />
@@ -769,7 +946,6 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Setup rota modal */}
       {showSetup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowSetup(false)}>
           <div className="absolute inset-0 bg-black/20" />
@@ -811,7 +987,7 @@ export default function CalendarPage() {
             <div className="flex gap-2 mt-5">
               <button onClick={generateRota} disabled={generating || !setupStartDate || !setupEndDate}
                 className="flex-1 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-                style={{ background: '#8B3A2A' }}>
+                style={{ background: '#46DA26' }}>
                 {generating ? 'Generating…' : 'Generate'}
               </button>
               <button onClick={() => setShowSetup(false)}
