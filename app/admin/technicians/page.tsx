@@ -148,7 +148,7 @@ export default function TechniciansPage() {
                   <td className="px-4 py-3 text-gray-500">{tech.job_title ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{tech.email}</td>
                   <td className="px-4 py-3">
-                    {tech.is_active && tech.leaving_date ? (
+                    {tech.leaving_date ? (
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">
                         Leaving {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                       </span>
