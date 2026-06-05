@@ -140,7 +140,16 @@ export default function WeeklyPlannerPage() {
         supabase.from('term_dates').select('start_date, end_date'),
         supabase.from('schools').select('id, name, short_name').eq('is_active', true).order('name'),
       ])
-      setTechnicians(techs ?? [])
+
+      // Also load any inactive technicians who have visits this week
+      const activeTechIds = new Set((techs ?? []).map((t: { id: string }) => t.id))
+      const extraTechIds = [...new Set((weekVisits ?? []).map((v: { technician_id: string }) => v.technician_id).filter((id: string) => !activeTechIds.has(id)))]
+      const extraTechs = extraTechIds.length > 0
+        ? (await supabase.from('technicians').select('id, full_name, initials, photo_url').in('id', extraTechIds)).data ?? []
+        : []
+      const allTechs = [...(techs ?? []), ...extraTechs].sort((a: { full_name: string }, b: { full_name: string }) => a.full_name.localeCompare(b.full_name))
+
+      setTechnicians(allTechs)
       setVisits(weekVisits ?? [])
       setBankHolidays(holidays ?? [])
       setTermDates(terms ?? [])
