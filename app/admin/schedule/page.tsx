@@ -135,7 +135,7 @@ export default function WeeklyPlannerPage() {
       ] = await Promise.all([
         supabase.from('technicians').select('id, full_name, initials, photo_url').eq('is_active', true).order('full_name'),
         supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).not('status','in','("banked","completed")').gte('visit_date', weekStart).lte('visit_date', weekEnd),
-        supabase.from('visits').select(`id, school_id, visit_type, slot, visit_date, schools (id, name, short_name)`).eq('status', 'banked').lte('visit_date', (() => { const d = new Date(); d.setDate(d.getDate() + 7); return toDateStr(d) })()),
+        supabase.from('visits').select(`id, school_id, visit_type, slot, visit_date, schools (id, name, short_name)`).eq('status', 'banked').order('visit_date'),
         supabase.from('bank_holidays').select('holiday_date, name'),
         supabase.from('term_dates').select('start_date, end_date'),
         supabase.from('schools').select('id, name, short_name').eq('is_active', true).order('name'),

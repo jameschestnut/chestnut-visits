@@ -78,13 +78,15 @@ export default function AdminNav({ profile }: { profile: Profile }) {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
-               style={{ background: '#8B3A2A' }}>
-            <span className="text-white font-semibold text-xs">CI</span>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: '#46DA26' }}>
+            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.5 2 5.5 4.5 5 8c-.2 1.4.1 2.7.8 3.8L4 20h16l-1.8-8.2c.7-1.1 1-2.4.8-3.8C18.5 4.5 15.5 2 12 2zm0 2c2.8 0 5 2.2 5 5s-2.2 5-5 5-5-2.2-5-5 2.2-5 5-5z"/>
+            </svg>
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-900 leading-tight">Chestnut</p>
-            <p className="text-xs text-gray-400 leading-tight">Infrastructure</p>
+            <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">Chestnut</p>
+            <p className="text-xs text-gray-400 leading-tight">Schedule</p>
           </div>
         </div>
       </div>
@@ -101,12 +103,13 @@ export default function AdminNav({ profile }: { profile: Profile }) {
               key={item.href}
               href={item.href}
               className={`
-                flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors
+                flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors font-medium
                 ${isActive
-                  ? 'bg-gray-900 text-white'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'text-white'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                 }
               `}
+              style={isActive ? { background: '#46DA26', color: 'white' } : {}}
             >
               {item.icon}
               {item.label}
