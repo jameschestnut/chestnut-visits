@@ -78,11 +78,9 @@ export default function AdminNav({ profile }: { profile: Profile }) {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-               style={{ background: '#46DA26' }}>
-            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C8.5 2 5.5 4.5 5 8c-.2 1.4.1 2.7.8 3.8L4 20h16l-1.8-8.2c.7-1.1 1-2.4.8-3.8C18.5 4.5 15.5 2 12 2zm0 2c2.8 0 5 2.2 5 5s-2.2 5-5 5-5-2.2-5-5 2.2-5 5-5z"/>
-            </svg>
+          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-white border border-gray-100">
+            {/* Drop logo.png into /public to display here */}
+            <img src="/logo.png" alt="Chestnut" className="w-7 h-7 object-contain" onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">Chestnut</p>

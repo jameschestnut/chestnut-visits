@@ -37,12 +37,7 @@ export default function LoginPage() {
 
         {/* Logo mark */}
         <div className="flex flex-col items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-               style={{ background: '#46DA26' }}>
-            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C8.5 2 5.5 4.5 5 8c-.2 1.4.1 2.7.8 3.8L4 20h16l-1.8-8.2c.7-1.1 1-2.4.8-3.8C18.5 4.5 15.5 2 12 2zm0 2c2.8 0 5 2.2 5 5s-2.2 5-5 5-5-2.2-5-5 2.2-5 5-5z"/>
-            </svg>
-          </div>
+          <img src="/logo.png" alt="Chestnut Schedule" className="w-16 h-16 object-contain" />
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Chestnut Schedule</h1>
             <p className="mt-0.5 text-sm text-gray-400">Chestnut Infrastructure</p>
