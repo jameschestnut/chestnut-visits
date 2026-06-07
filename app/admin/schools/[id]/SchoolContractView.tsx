@@ -155,10 +155,6 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
   const total      = contractVisits.length
   const remaining  = total - completed - banked
 
-  const isActiveContract = selected
-    ? selected.status === 'active' && selected.start_date <= today && selected.end_date >= today
-    : false
-
   return (
     <div className="grid grid-cols-3 gap-4">
 
@@ -170,13 +166,6 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700">Contracts</h2>
             <div className="flex items-center gap-3">
-              {isActiveContract && (
-                <Link href={`/admin/schools/${schoolId}/schedule/generate`}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
-                  style={{ background: '#46DA26' }}>
-                  Generate schedule
-                </Link>
-              )}
               <Link href={`/admin/schools/${schoolId}/contracts/new`}
                 className="text-xs text-gray-400 hover:text-gray-700">
                 + Add contract
