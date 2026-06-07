@@ -24,7 +24,6 @@ const FREQUENCY_LABELS: Record<string, string> = {
   twice_weekly:          '2x Weekly',
   three_times_weekly:    '3x Weekly',
   fortnightly:           'Fortnightly',
-  three_weekly:          'Every 3 weeks',
   monthly:               'Monthly',
   half_termly:           'Half-termly',
   termly:                'Termly',
@@ -37,8 +36,6 @@ interface Contract {
   end_date: string
   frequency: string
   visit_duration: string
-  fortnightly_tag: number | null
-  monthly_tags: number[] | null
 }
 
 interface RotaWeek {
@@ -86,25 +83,27 @@ export default function ScheduleGeneratorPage() {
   const schoolId = params.id as string
   const supabase = createClient()
 
-  const [school, setSchool]           = useState<{ name: string } | null>(null)
-  const [contract, setContract]       = useState<Contract | null>(null)
-  const [technicians, setTechnicians] = useState<{ id: string; full_name: string; initials: string }[]>([])
+  const [school, setSchool]             = useState<{ name: string } | null>(null)
+  const [contract, setContract]         = useState<Contract | null>(null)
+  const [technicians, setTechnicians]   = useState<{ id: string; full_name: string; initials: string }[]>([])
   const [rotaCalendar, setRotaCalendar] = useState<RotaWeek[]>([])
-  const [termDates, setTermDates]     = useState<TermDate[]>([])
+  const [termDates, setTermDates]       = useState<TermDate[]>([])
   const [bankHolidays, setBankHolidays] = useState<Set<string>>(new Set())
   const [existingVisits, setExistingVisits] = useState<{ visit_date: string; slot: string; technician_id: string }[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [noRota, setNoRota]           = useState(false)
+  const [loading, setLoading]           = useState(true)
+  const [noRota, setNoRota]             = useState(false)
 
-  const [techId, setTechId]           = useState('')
+  // Settings
+  const [techId, setTechId]             = useState('')
   const [preferredDay, setPreferredDay] = useState(1)
   const [preferredSlot, setPreferredSlot] = useState('am')
-  // For termly/custom: manual dates
-  const [manualDates, setManualDates] = useState<string[]>([''])
+  const [fortnightlyTag, setFortnightlyTag] = useState<1 | 2 | null>(null)
+  const [monthlyTags, setMonthlyTags]   = useState<number[]>([])
+  const [manualDates, setManualDates]   = useState<string[]>([''])
 
-  const [preview, setPreview]         = useState<GeneratedVisit[] | null>(null)
-  const [saving, setSaving]           = useState(false)
-  const [error, setError]             = useState<string | null>(null)
+  const [preview, setPreview]   = useState<GeneratedVisit[] | null>(null)
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -118,7 +117,7 @@ export default function ScheduleGeneratorPage() {
         { data: visitData },
       ] = await Promise.all([
         supabase.from('schools').select('name').eq('id', schoolId).single(),
-        supabase.from('contracts').select('id,start_date,end_date,frequency,visit_duration,fortnightly_tag,monthly_tags')
+        supabase.from('contracts').select('id,start_date,end_date,frequency,visit_duration')
           .eq('school_id', schoolId).eq('status', 'active')
           .lte('start_date', new Date().toISOString().split('T')[0])
           .gte('end_date', new Date().toISOString().split('T')[0])
@@ -143,8 +142,6 @@ export default function ScheduleGeneratorPage() {
     load()
   }, [schoolId])
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
   function getTermName(dateStr: string): string {
     const t = termDates.find(t => dateStr >= t.start_date && dateStr <= t.end_date)
     return t?.term_name ?? 'School holiday'
@@ -163,58 +160,55 @@ export default function ScheduleGeneratorPage() {
   }
 
   function resolveDate(weekStart: Date, dayOffset: number): { date: string; bhAdjusted: boolean } {
-    const d     = addDays(weekStart, dayOffset)
-    const dStr  = toStr(d)
+    const d    = addDays(weekStart, dayOffset)
+    const dStr = toStr(d)
     if (bankHolidays.has(dStr)) {
-      const tue     = addDays(weekStart, dayOffset === 0 ? 1 : dayOffset + 1)
+      const tue = addDays(weekStart, dayOffset === 0 ? 1 : dayOffset + 1)
       return { date: toStr(tue), bhAdjusted: true }
     }
     return { date: dStr, bhAdjusted: false }
   }
 
-  // ── Tag validation ─────────────────────────────────────────────────────────
-
-  function contractNeedsFortnightlyTag(): boolean {
+  function needsFortnightlyTag(): boolean {
     return ['fortnightly', 'one_point_five_weekly'].includes(contract?.frequency ?? '')
   }
 
-  function contractNeedsMonthlyTags(): boolean {
-    return ['monthly', 'three_weekly', 'half_termly'].includes(contract?.frequency ?? '')
+  function needsMonthlyTags(): boolean {
+    return ['monthly', 'half_termly'].includes(contract?.frequency ?? '')
   }
 
-  function tagsConfigured(): boolean {
+  function tagsReady(): boolean {
     if (!contract) return false
-    const freq = contract.frequency
-    if (freq === 'fortnightly' || freq === 'one_point_five_weekly') {
-      return contract.fortnightly_tag === 1 || contract.fortnightly_tag === 2
-    }
-    if (freq === 'monthly' || freq === 'three_weekly' || freq === 'half_termly') {
-      return Array.isArray(contract.monthly_tags) && contract.monthly_tags.length > 0
-    }
+    if (needsFortnightlyTag()) return fortnightlyTag === 1 || fortnightlyTag === 2
+    if (needsMonthlyTags()) return monthlyTags.length > 0
     return true
   }
 
-  // ── Generate ───────────────────────────────────────────────────────────────
+  function toggleMonthlyTag(tag: number) {
+    setMonthlyTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag].sort()
+    )
+    setPreview(null)
+  }
 
   function generatePreview() {
     if (!contract || !techId) return
     setError(null)
 
-    const freq      = contract.frequency
-    const isManual  = freq === 'termly' || freq === 'custom'
+    const freq     = contract.frequency
+    const isManual = freq === 'termly' || freq === 'custom'
 
     if (isManual) {
       const visits: GeneratedVisit[] = []
       for (const ds of manualDates) {
         if (!ds) continue
-        const isBH = bankHolidays.has(ds)
         visits.push({
-          date:        ds,
-          slot:        contract.visit_duration === 'full_day' ? 'full_day' : preferredSlot,
-          termName:    getTermName(ds),
-          isBankHoliday: isBH,
-          bhAdjusted:  false,
-          conflict:    hasConflict(ds, preferredSlot, techId),
+          date:          ds,
+          slot:          contract.visit_duration === 'full_day' ? 'full_day' : preferredSlot,
+          termName:      getTermName(ds),
+          isBankHoliday: bankHolidays.has(ds),
+          bhAdjusted:    false,
+          conflict:      hasConflict(ds, preferredSlot, techId),
         })
       }
       if (visits.length === 0) { setError('Add at least one visit date.'); return }
@@ -225,7 +219,7 @@ export default function ScheduleGeneratorPage() {
     const visits: GeneratedVisit[] = []
     const contractStart = new Date(contract.start_date + 'T12:00:00')
     const contractEnd   = new Date(contract.end_date + 'T12:00:00')
-    const dayOffset     = preferredDay - 1  // 0=Mon, 1=Tue, …
+    const dayOffset     = preferredDay - 1
 
     let weekStart = getMondayOf(contractStart)
 
@@ -242,10 +236,10 @@ export default function ScheduleGeneratorPage() {
         visits.push({
           date,
           slot,
-          termName:    getTermName(date),
+          termName:      getTermName(date),
           isBankHoliday: bankHolidays.has(date),
           bhAdjusted,
-          conflict:    hasConflict(date, slot, techId),
+          conflict:      hasConflict(date, slot, techId),
         })
       }
 
@@ -256,26 +250,21 @@ export default function ScheduleGeneratorPage() {
       } else if (freq === 'twice_weekly' && rota.tag_weekly) {
         addVisit(dayOffset, 'full_day')
       } else if (freq === 'three_times_weekly' && rota.tag_weekly) {
-        addVisit(0, slot)  // Monday
-        addVisit(2, slot)  // Wednesday
-        addVisit(4, slot)  // Friday
-      } else if (freq === 'fortnightly' && rota.tag_fortnightly === contract.fortnightly_tag) {
+        addVisit(0, slot)
+        addVisit(2, slot)
+        addVisit(4, slot)
+      } else if (freq === 'fortnightly' && fortnightlyTag !== null && rota.tag_fortnightly === fortnightlyTag) {
         addVisit(dayOffset, slot)
-      } else if (freq === 'one_point_five_weekly') {
-        if (rota.tag_fortnightly === contract.fortnightly_tag) {
+      } else if (freq === 'one_point_five_weekly' && fortnightlyTag !== null) {
+        if (rota.tag_fortnightly === fortnightlyTag) {
           addVisit(dayOffset, 'full_day')
         } else if (rota.tag_weekly) {
           addVisit(dayOffset, preferredSlot)
         }
-      } else if ((freq === 'monthly' || freq === 'three_weekly') &&
-                 Array.isArray(contract.monthly_tags) &&
+      } else if ((freq === 'monthly' || freq === 'half_termly') &&
+                 monthlyTags.length > 0 &&
                  rota.tag_monthly !== null &&
-                 contract.monthly_tags.includes(rota.tag_monthly)) {
-        addVisit(dayOffset, slot)
-      } else if (freq === 'half_termly' &&
-                 Array.isArray(contract.monthly_tags) &&
-                 rota.tag_monthly !== null &&
-                 contract.monthly_tags.includes(rota.tag_monthly)) {
+                 monthlyTags.includes(rota.tag_monthly)) {
         addVisit(dayOffset, slot)
       }
 
@@ -283,12 +272,10 @@ export default function ScheduleGeneratorPage() {
     }
 
     if (visits.length === 0) {
-      setError('No visits generated. Check the rota calendar tags match the contract settings.')
+      setError('No visits generated. Check the schedule week tags match your selection.')
     }
     setPreview(visits)
   }
-
-  // ── Save ───────────────────────────────────────────────────────────────────
 
   async function handleConfirm() {
     if (!preview || !contract) return
@@ -312,8 +299,6 @@ export default function ScheduleGeneratorPage() {
     router.push(`/admin/schools/${schoolId}`)
     router.refresh()
   }
-
-  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -354,7 +339,7 @@ export default function ScheduleGeneratorPage() {
         </div>
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 text-center">
           <p className="text-sm text-amber-700 font-medium mb-1">No rota calendar set up</p>
-          <p className="text-xs text-amber-600 mb-4">Set up the rota calendar before generating schedules.</p>
+          <p className="text-xs text-amber-600 mb-4">Set up the schedule weeks in the calendar before generating schedules.</p>
           <Link href="/admin/calendar"
             className="inline-flex px-4 py-2 rounded-lg text-sm font-medium text-white"
             style={{ background: '#46DA26' }}>
@@ -369,7 +354,7 @@ export default function ScheduleGeneratorPage() {
   const isManual     = freq === 'termly' || freq === 'custom'
   const showDayPick  = !isManual && freq !== 'three_times_weekly'
   const showSlotPick = !isManual && freq !== 'twice_weekly' && freq !== 'three_times_weekly'
-  const needsTags    = !tagsConfigured()
+  const canGenerate  = !!techId && tagsReady()
 
   const confirmedCount = preview?.filter(v => !v.conflict).length ?? 0
   const conflictCount  = preview?.filter(v => v.conflict).length ?? 0
@@ -385,25 +370,6 @@ export default function ScheduleGeneratorPage() {
         <span className="text-gray-200">/</span>
         <h1 className="text-xl font-semibold text-gray-900">Generate schedule</h1>
       </div>
-
-      {needsTags && (
-        <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3">
-          <span className="text-amber-500 text-lg">⚠</span>
-          <div>
-            <p className="text-sm font-medium text-amber-800">Contract tags not configured</p>
-            <p className="text-xs text-amber-600 mt-0.5">
-              This contract needs{' '}
-              {contractNeedsFortnightlyTag() ? 'a fortnightly tag (1 or 2)' : ''}
-              {contractNeedsMonthlyTags() ? 'monthly tags' : ''}{' '}
-              set before generating a schedule.
-            </p>
-            <Link href={`/admin/schools/${schoolId}/contracts/${contract.id}/edit`}
-              className="inline-block mt-2 text-xs font-medium text-amber-700 underline">
-              Edit contract →
-            </Link>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-3 gap-4">
 
@@ -433,18 +399,6 @@ export default function ScheduleGeneratorPage() {
                   {new Date(contract.end_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </dd>
               </div>
-              {contract.fortnightly_tag && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-400">Fortnightly tag</dt>
-                  <dd className="font-medium text-gray-900">{contract.fortnightly_tag}</dd>
-                </div>
-              )}
-              {Array.isArray(contract.monthly_tags) && contract.monthly_tags.length > 0 && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-400">Monthly tags</dt>
-                  <dd className="font-medium text-gray-900">{contract.monthly_tags.join(', ')}</dd>
-                </div>
-              )}
             </dl>
           </div>
 
@@ -499,6 +453,51 @@ export default function ScheduleGeneratorPage() {
               </div>
             )}
 
+            {/* Fortnightly tag picker */}
+            {needsFortnightlyTag() && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">Fortnightly group</label>
+                <div className="flex gap-2">
+                  {([1, 2] as const).map(tag => (
+                    <button key={tag} type="button"
+                      onClick={() => { setFortnightlyTag(tag); setPreview(null) }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        fortnightlyTag === tag
+                          ? 'border-gray-900 bg-gray-900 text-white'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}>
+                      Week {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Monthly tag picker */}
+            {needsMonthlyTags() && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Monthly schedule slots
+                </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  {freq === 'half_termly' ? 'Select 1 slot.' : 'Select a pair (e.g. 1 & 4).'}
+                </p>
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5, 6].map(tag => (
+                    <button key={tag} type="button"
+                      onClick={() => toggleMonthlyTag(tag)}
+                      className={`w-9 h-9 rounded-lg text-sm font-bold border transition-colors ${
+                        monthlyTags.includes(tag)
+                          ? 'border-gray-900 bg-gray-900 text-white'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {isManual && (
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-2">Visit dates</label>
@@ -537,7 +536,7 @@ export default function ScheduleGeneratorPage() {
 
             <button
               onClick={generatePreview}
-              disabled={!techId || (needsTags && !isManual)}
+              disabled={!canGenerate}
               className="w-full py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40"
               style={{ background: '#46DA26' }}>
               Preview schedule
