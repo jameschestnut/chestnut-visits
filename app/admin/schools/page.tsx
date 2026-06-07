@@ -29,7 +29,7 @@ export default function SchoolsPage() {
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
   const [hideInactive, setHideInactive] = useState(true)
-  const [sortCol, setSortCol]       = useState<'name' | 'town'>('name')
+  const [sortCol, setSortCol]       = useState<'name'>('name')
   const [sortDir, setSortDir]       = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function SchoolsPage() {
   const activeCount   = schools.filter(s => hasActiveContract(s)).length
   const inactiveCount = schools.filter(s => !hasActiveContract(s)).length
 
-  function toggleSort(col: 'name' | 'town') {
+  function toggleSort(col: 'name') {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(col); setSortDir('asc') }
   }
@@ -110,10 +110,7 @@ export default function SchoolsPage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800" onClick={() => toggleSort('name')}>
-                  School {sortCol === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800" onClick={() => toggleSort('town')}>
-                  Town {sortCol === 'town' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  School {sortDir === 'asc' ? '↑' : '↓'}
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
               </tr>
@@ -146,7 +143,6 @@ export default function SchoolsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{school.town ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                       hasActiveContract(school) ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
