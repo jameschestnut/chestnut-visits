@@ -13,6 +13,14 @@ const VISIT_TYPE_LABELS: Record<string, string> = {
   other_visit:        'Other visit',
 }
 
+const DELETE_REASONS = [
+  'Created in error',
+  'Duplicate',
+  'School closed',
+  'Cancelled by school',
+  'Other',
+]
+
 interface Contract {
   id: string
   start_date: string
@@ -29,6 +37,16 @@ interface Visit {
   visit_type: string
   status: string
   notes: string | null
+  technicians: unknown
+}
+
+interface DeletedVisit {
+  id: string
+  visit_date: string
+  slot: string | null
+  visit_type: string | null
+  reason: string | null
+  deleted_at: string
   technicians: unknown
 }
 
@@ -75,21 +93,61 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
     sorted.find(c => c.status === 'active' && c.start_date <= today && c.end_date >= today) ??
     sorted[0]
 
-  const [selectedId, setSelectedId] = useState<string>(defaultContract?.id ?? '')
-  const [visits, setVisits] = useState<Visit[]>(allVisits)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedId, setSelectedId]     = useState<string>(defaultContract?.id ?? '')
+  const [visits, setVisits]             = useState<Visit[]>(allVisits)
+  const [deletingId, setDeletingId]     = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Visit | null>(null)
+  const [deleteReason, setDeleteReason] = useState('')
+  const [deleteInProgress, setDeleteInProgress] = useState(false)
+
+  const [showDeleted, setShowDeleted]       = useState(false)
+  const [deletedVisits, setDeletedVisits]   = useState<DeletedVisit[]>([])
+  const [loadingDeleted, setLoadingDeleted] = useState(false)
+
   const selected = sorted.find(c => c.id === selectedId) ?? null
 
   const contractVisits = selected
     ? visits.filter(v => v.visit_date >= selected.start_date && v.visit_date <= selected.end_date)
     : []
 
-  async function deleteVisit(visitId: string) {
-    if (!confirm('Delete this visit? This cannot be undone.')) return
-    setDeletingId(visitId)
-    await supabase.from('visits').delete().eq('id', visitId)
-    setVisits(prev => prev.filter(v => v.id !== visitId))
-    setDeletingId(null)
+  async function loadDeletedVisits() {
+    if (!selected) return
+    setLoadingDeleted(true)
+    const { data } = await supabase
+      .from('visit_deletions')
+      .select('id, visit_date, slot, visit_type, reason, deleted_at, technicians:technician_id(full_name)')
+      .eq('school_id', schoolId)
+      .gte('visit_date', selected.start_date)
+      .lte('visit_date', selected.end_date)
+      .order('visit_date', { ascending: false })
+    setDeletedVisits(data ?? [])
+    setLoadingDeleted(false)
+  }
+
+  function toggleDeleted() {
+    if (!showDeleted && deletedVisits.length === 0) loadDeletedVisits()
+    setShowDeleted(v => !v)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || !deleteReason) return
+    setDeleteInProgress(true)
+    const v = deleteTarget
+    await supabase.from('visit_deletions').insert({
+      visit_date:    v.visit_date,
+      school_id:     schoolId,
+      technician_id: (v.technicians as { id: string } | null)?.id ?? null,
+      slot:          v.slot,
+      visit_type:    v.visit_type,
+      reason:        deleteReason,
+    })
+    await supabase.from('visits').delete().eq('id', v.id)
+    setVisits(prev => prev.filter(x => x.id !== v.id))
+    // refresh deleted list if open
+    if (showDeleted) loadDeletedVisits()
+    setDeleteTarget(null)
+    setDeleteReason('')
+    setDeleteInProgress(false)
   }
 
   const completed  = contractVisits.filter(v => v.status === 'completed').length
@@ -133,7 +191,7 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
                 const isSelected = contract.id === selectedId
                 return (
                   <button key={contract.id}
-                    onClick={() => setSelectedId(contract.id)}
+                    onClick={() => { setSelectedId(contract.id); setShowDeleted(false); setDeletedVisits([]) }}
                     className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
                       isSelected
                         ? 'border-gray-900 bg-gray-900 text-white'
@@ -227,7 +285,7 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
                       {v.status}
                     </span>
                     <button
-                      onClick={() => deleteVisit(v.id)}
+                      onClick={() => { setDeleteTarget(v); setDeleteReason('') }}
                       disabled={deletingId === v.id}
                       className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all shrink-0 disabled:opacity-30"
                       title="Delete visit"
@@ -238,6 +296,53 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
             </div>
           ) : (
             <p className="text-sm text-gray-400 text-center py-4">No visits scheduled yet</p>
+          )}
+
+          {/* Deleted visits toggle */}
+          {selected && (
+            <div className="mt-4 pt-4 border-t border-gray-50">
+              <button
+                onClick={toggleDeleted}
+                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                <span>{showDeleted ? '▾' : '▸'}</span>
+                Deleted visits
+              </button>
+
+              {showDeleted && (
+                <div className="mt-3">
+                  {loadingDeleted ? (
+                    <p className="text-xs text-gray-400 py-2">Loading…</p>
+                  ) : deletedVisits.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">No deleted visits for this contract period.</p>
+                  ) : (
+                    <div className="divide-y divide-gray-50">
+                      {deletedVisits.map(v => {
+                        const dayName = DAY_NAMES[new Date(v.visit_date + 'T12:00:00').getDay()]
+                        const techName = (v.technicians as { full_name: string } | null)?.full_name
+                        return (
+                          <div key={v.id} className="flex items-center gap-2 py-2 text-xs opacity-60">
+                            <span className="text-gray-400 w-6 shrink-0">{dayName}</span>
+                            <span className="text-gray-500 w-20 shrink-0">{fmtDate(v.visit_date)}</span>
+                            {v.slot && (
+                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium shrink-0">
+                                {v.slot === 'full_day' ? 'Full' : v.slot.toUpperCase()}
+                              </span>
+                            )}
+                            {techName && (
+                              <span className="text-gray-500 shrink-0">{techName.split(' ')[0]}</span>
+                            )}
+                            <span className="flex-1 text-gray-400 truncate italic">
+                              {v.reason ?? 'No reason given'}
+                            </span>
+                            <span className="text-gray-300 shrink-0 line-through">deleted</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -319,6 +424,39 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
         </div>
 
       </div>
+
+      {/* Delete visit modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Delete visit</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              {DAY_NAMES[new Date(deleteTarget.visit_date + 'T12:00:00').getDay()]}{' '}
+              {fmtDate(deleteTarget.visit_date)}
+              {deleteTarget.slot !== 'full_day' ? ` · ${deleteTarget.slot.toUpperCase()}` : ' · Full day'}
+            </p>
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></p>
+              <select value={deleteReason} onChange={e => setDeleteReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900">
+                <option value="">Select a reason…</option>
+                {DELETE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={confirmDelete} disabled={deleteInProgress || !deleteReason}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
+                {deleteInProgress ? 'Deleting…' : 'Delete'}
+              </button>
+              <button onClick={() => { setDeleteTarget(null); setDeleteReason('') }}
+                className="flex-1 py-2 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

@@ -6,22 +6,35 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 
 const FREQUENCY_OPTIONS = [
-  { value: 'weekly',                  label: 'Weekly',        description: '38 visits/year' },
-  { value: 'one_point_five_weekly',   label: '1.5x Weekly',   description: '57 visits/year' },
-  { value: 'twice_weekly',            label: '2x Weekly',     description: '76 visits/year' },
-  { value: 'three_times_weekly',      label: '3x Weekly',     description: '114 visits/year' },
-  { value: 'fortnightly',             label: 'Fortnightly',   description: '19 visits/year' },
-  { value: 'three_weekly',            label: 'Every 3 weeks', description: '~13 visits/year' },
-  { value: 'monthly',                 label: 'Monthly',       description: '12 visits/year' },
-  { value: 'half_termly',             label: 'Half-termly',   description: '6 visits/year' },
-  { value: 'termly',                  label: 'Termly',        description: '3 visits/year' },
-  { value: 'custom',                  label: 'Custom',        description: 'Set manually' },
+  { value: 'weekly',                label: 'Weekly',        description: '38 visits/year' },
+  { value: 'one_point_five_weekly', label: '1.5x Weekly',   description: '57 visits/year' },
+  { value: 'twice_weekly',          label: '2x Weekly',     description: '76 visits/year' },
+  { value: 'three_times_weekly',    label: '3x Weekly',     description: '114 visits/year' },
+  { value: 'fortnightly',           label: 'Fortnightly',   description: '19 visits/year' },
+  { value: 'monthly',               label: 'Monthly',       description: '12 visits/year' },
+  { value: 'half_termly',           label: 'Half-termly',   description: '6 visits/year' },
+  { value: 'termly',                label: 'Termly',        description: '3 visits/year' },
+  { value: 'custom',                label: 'Custom',        description: 'Set manually' },
 ]
 
 const DURATION_OPTIONS = [
   { value: 'half_day', label: 'Half day', description: '3.5hr visit · 4hr blocked' },
   { value: 'full_day', label: 'Full day', description: '7hr visit · 8hr blocked' },
 ]
+
+function getDatePresets() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth() + 1
+  const laStart   = m >= 4 ? y : y - 1
+  const acadStart = m >= 9 ? y : y - 1
+  return [
+    { label: `LA ${laStart}-${String(laStart + 1).slice(2)}`,     start: `${laStart}-04-01`,     end: `${laStart + 1}-03-31` },
+    { label: `LA ${laStart + 1}-${String(laStart + 2).slice(2)}`, start: `${laStart + 1}-04-01`, end: `${laStart + 2}-03-31` },
+    { label: `Acad ${acadStart}-${String(acadStart + 1).slice(2)}`,     start: `${acadStart}-09-01`,     end: `${acadStart + 1}-07-18` },
+    { label: `Acad ${acadStart + 1}-${String(acadStart + 2).slice(2)}`, start: `${acadStart + 1}-09-01`, end: `${acadStart + 2}-07-18` },
+  ]
+}
 
 export default function NewContractPage() {
   const router = useRouter()
@@ -32,16 +45,12 @@ export default function NewContractPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
-
   const [form, setForm] = useState({
     start_date: '2026-09-01',
     end_date: '2027-07-18',
     frequency: 'fortnightly',
     custom_visits_per_year: '',
     visit_duration: 'half_day',
-    fortnightly_tag: '' as '' | '1' | '2',
-    monthly_tags: [] as number[],
     notes: '',
   })
 
@@ -49,42 +58,23 @@ export default function NewContractPage() {
     const { name, value } = e.target
     setForm(prev => {
       const updated = { ...prev, [name]: value }
-      if (name === 'start_date' && value > prev.end_date) {
-        updated.end_date = value
-      }
-      if (name === 'frequency') {
-        updated.fortnightly_tag = ''
-        updated.monthly_tags = []
-      }
+      if (name === 'start_date' && value > prev.end_date) updated.end_date = value
       return updated
     })
   }
 
-  function toggleMonthlyTag(tag: number) {
-    setForm(prev => {
-      const tags = prev.monthly_tags.includes(tag)
-        ? prev.monthly_tags.filter(t => t !== tag)
-        : [...prev.monthly_tags, tag].sort()
-      return { ...prev, monthly_tags: tags }
-    })
-  }
-
-  // Calculate expected visits based on frequency
-  // Uses 38 teaching weeks as the base
   function expectedVisits(): string {
-    const weeks = 38
     switch (form.frequency) {
-      case 'weekly':                  return '38'
-      case 'one_point_five_weekly':   return '57'
-      case 'twice_weekly':            return '76'
-      case 'three_times_weekly':      return '114'
-      case 'fortnightly':             return '19'
-      case 'three_weekly':            return '~13'
-      case 'monthly':                 return '12'
-      case 'half_termly':             return '6'
-      case 'termly':                  return '3'
-      case 'custom':                  return form.custom_visits_per_year || '—'
-      default:                        return '—'
+      case 'weekly':                return '38'
+      case 'one_point_five_weekly': return '57'
+      case 'twice_weekly':          return '76'
+      case 'three_times_weekly':    return '114'
+      case 'fortnightly':           return '19'
+      case 'monthly':               return '12'
+      case 'half_termly':           return '6'
+      case 'termly':                return '3'
+      case 'custom':                return form.custom_visits_per_year || '—'
+      default:                      return '—'
     }
   }
 
@@ -93,10 +83,9 @@ export default function NewContractPage() {
     setLoading(true)
     setError(null)
 
-    // Check for overlapping contracts
     const { data: existing } = await supabase
       .from('contracts')
-      .select('id, start_date, end_date, frequency')
+      .select('id, start_date, end_date')
       .eq('school_id', schoolId)
       .neq('status', 'cancelled')
     const overlap = (existing ?? []).find(
@@ -109,45 +98,39 @@ export default function NewContractPage() {
       return
     }
 
-    // Derive academic year from start date
     const startYear = new Date(form.start_date).getFullYear()
     const endYear   = new Date(form.end_date).getFullYear()
     const academicYear = startYear === endYear
       ? `${startYear}`
       : `${startYear}-${String(endYear).slice(2)}`
 
+    const today = new Date().toISOString().split('T')[0]
+    const status = form.end_date < today ? 'expired' : 'active'
+
     const { error } = await supabase
       .from('contracts')
       .insert({
-        school_id:               schoolId,
-        academic_year:           academicYear,
-        start_date:              form.start_date,
-        end_date:                form.end_date,
-        frequency:               form.frequency,
-        custom_visits_per_year:  form.frequency === 'custom'
-                                   ? parseInt(form.custom_visits_per_year) || null
-                                   : null,
-        visit_duration:          form.visit_duration,
-        status:                  'active',
-        fortnightly_tag:         form.fortnightly_tag ? parseInt(form.fortnightly_tag) : null,
-        monthly_tags:            form.monthly_tags.length > 0 ? form.monthly_tags : null,
-        notes:                   form.notes.trim() || null,
+        school_id:              schoolId,
+        academic_year:          academicYear,
+        start_date:             form.start_date,
+        end_date:               form.end_date,
+        frequency:              form.frequency,
+        custom_visits_per_year: form.frequency === 'custom' ? parseInt(form.custom_visits_per_year) || null : null,
+        visit_duration:         form.visit_duration,
+        status,
+        notes:                  form.notes.trim() || null,
       })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-
+    if (error) { setError(error.message); setLoading(false); return }
     router.push(`/admin/schools/${schoolId}`)
     router.refresh()
   }
 
+  const presets = getDatePresets()
+
   return (
     <div className="max-w-lg">
 
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Link href={`/admin/schools/${schoolId}`} className="text-gray-400 hover:text-gray-600 text-sm">
           ← School
@@ -162,33 +145,38 @@ export default function NewContractPage() {
         <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700">Contract period</h2>
 
+          <div className="flex flex-wrap gap-2">
+            {presets.map(p => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, start_date: p.start, end_date: p.end }))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  form.start_date === p.start && form.end_date === p.end
+                    ? 'border-gray-900 bg-gray-900 text-white'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Start date <span className="text-red-500">*</span>
               </label>
-              <input
-                name="start_date"
-                type="date"
-                required
-                value={form.start_date}
+              <input name="start_date" type="date" required value={form.start_date}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 End date <span className="text-red-500">*</span>
               </label>
-              <input
-                name="end_date"
-                type="date"
-                required
-                min={form.start_date}
-                value={form.end_date}
+              <input name="end_date" type="date" required min={form.start_date} value={form.end_date}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
             </div>
           </div>
         </div>
@@ -205,14 +193,9 @@ export default function NewContractPage() {
                     ? 'border-gray-900 bg-gray-900 text-white'
                     : 'border-gray-200 hover:bg-gray-50'
                 }`}>
-                <input
-                  type="radio"
-                  name="frequency"
-                  value={opt.value}
+                <input type="radio" name="frequency" value={opt.value}
                   checked={form.frequency === opt.value}
-                  onChange={handleChange}
-                  className="sr-only"
-                />
+                  onChange={handleChange} className="sr-only" />
                 <span className="text-sm font-medium">{opt.label}</span>
                 <span className={`text-xs mt-0.5 ${form.frequency === opt.value ? 'text-gray-300' : 'text-gray-400'}`}>
                   {opt.description}
@@ -226,78 +209,18 @@ export default function NewContractPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Visits per year <span className="text-red-500">*</span>
               </label>
-              <input
-                name="custom_visits_per_year"
-                type="number"
-                min="1"
-                max="200"
-                required
-                value={form.custom_visits_per_year}
-                onChange={handleChange}
+              <input name="custom_visits_per_year" type="number" min="1" max="200"
+                required value={form.custom_visits_per_year} onChange={handleChange}
                 placeholder="e.g. 25"
-                className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
+                className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
             </div>
           )}
 
-          {/* Expected visits summary */}
           <div className="bg-gray-50 rounded-lg px-4 py-3 flex items-center justify-between">
             <span className="text-sm text-gray-500">Expected visits this contract</span>
             <span className="text-sm font-semibold text-gray-900">{expectedVisits()}</span>
           </div>
         </div>
-
-        {/* Rota tags */}
-        {(form.frequency === 'fortnightly' || form.frequency === 'one_point_five_weekly') && (
-          <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700">Fortnightly tag</h2>
-            <p className="text-xs text-gray-400">Which fortnightly group does this school visit on?</p>
-            <div className="flex gap-3">
-              {(['1', '2'] as const).map(tag => (
-                <label key={tag}
-                  className={`flex-1 flex items-center justify-center px-3 py-2.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors ${
-                    form.fortnightly_tag === tag
-                      ? 'border-gray-900 bg-gray-900 text-white'
-                      : 'border-gray-200 hover:bg-gray-50'
-                  }`}>
-                  <input type="radio" name="fortnightly_tag" value={tag}
-                    checked={form.fortnightly_tag === tag}
-                    onChange={handleChange} className="sr-only" />
-                  Group {tag}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(form.frequency === 'monthly' || form.frequency === 'three_weekly' || form.frequency === 'half_termly') && (
-          <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700">Monthly tags</h2>
-            <p className="text-xs text-gray-400">
-              {form.frequency === 'half_termly'
-                ? 'Select 1 tag (one visit per half-term).'
-                : form.frequency === 'three_weekly'
-                ? 'Select a pair (1&4, 2&5, or 3&6).'
-                : 'Select a pair for monthly visits (1&4, 2&5, or 3&6).'}
-            </p>
-            <div className="flex gap-2">
-              {[1,2,3,4,5,6].map(tag => (
-                <button key={tag} type="button"
-                  onClick={() => toggleMonthlyTag(tag)}
-                  className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors border ${
-                    form.monthly_tags.includes(tag)
-                      ? 'border-gray-900 bg-gray-900 text-white'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}>
-                  {tag}
-                </button>
-              ))}
-            </div>
-            {form.monthly_tags.length > 0 && (
-              <p className="text-xs text-gray-500">Selected: {form.monthly_tags.join(', ')}</p>
-            )}
-          </div>
-        )}
 
         {/* Visit duration */}
         <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
@@ -310,14 +233,9 @@ export default function NewContractPage() {
                     ? 'border-gray-900 bg-gray-900 text-white'
                     : 'border-gray-200 hover:bg-gray-50'
                 }`}>
-                <input
-                  type="radio"
-                  name="visit_duration"
-                  value={opt.value}
+                <input type="radio" name="visit_duration" value={opt.value}
                   checked={form.visit_duration === opt.value}
-                  onChange={handleChange}
-                  className="sr-only"
-                />
+                  onChange={handleChange} className="sr-only" />
                 <span className="text-sm font-medium">{opt.label}</span>
                 <span className={`text-xs mt-0.5 ${form.visit_duration === opt.value ? 'text-gray-300' : 'text-gray-400'}`}>
                   {opt.description}
@@ -330,14 +248,9 @@ export default function NewContractPage() {
         {/* Notes */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Notes</h2>
-          <textarea
-            name="notes"
-            value={form.notes}
-            onChange={handleChange}
-            rows={3}
+          <textarea name="notes" value={form.notes} onChange={handleChange} rows={3}
             placeholder="Any notes about this contract..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-          />
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
         </div>
 
         {error && (
@@ -345,18 +258,13 @@ export default function NewContractPage() {
         )}
 
         <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
-            style={{ background: '#8B3A2A' }}
-          >
+          <button type="submit" disabled={loading}
+            className="px-6 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: '#46DA26' }}>
             {loading ? 'Saving…' : 'Save contract'}
           </button>
-          <Link
-            href={`/admin/schools/${schoolId}`}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50"
-          >
+          <Link href={`/admin/schools/${schoolId}`}
+            className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50">
             Cancel
           </Link>
         </div>

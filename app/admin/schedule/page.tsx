@@ -118,7 +118,6 @@ export default function WeeklyPlannerPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Visit | null>(null)
   const [deleteReason, setDeleteReason] = useState('')
-  const [deleteNotes, setDeleteNotes] = useState('')
   const [deleting, setDeleting] = useState(false)
 
   const drag = useRef<{ source: 'grid' | 'sidebar'; visitId?: string; sidebarItem?: SidebarVisit } | null>(null)
@@ -252,9 +251,8 @@ export default function WeeklyPlannerPage() {
     const pairedSlot = deleteTarget.slot === 'am' ? 'pm' : 'am'
     const paired = visits.find(v => v.technician_id === deleteTarget.technician_id && v.visit_date === deleteTarget.visit_date && v.slot === pairedSlot && v.visit_type === deleteTarget.visit_type && v.school_id === deleteTarget.school_id)
     const toDelete = [deleteTarget, ...(paired ? [paired] : [])]
-    const fullReason = deleteNotes.trim() ? `${deleteReason} — ${deleteNotes.trim()}` : deleteReason
     for (const v of toDelete) {
-      await supabase.from('visit_deletions').insert({ visit_date: v.visit_date, school_id: v.school_id, technician_id: v.technician_id, slot: v.slot, visit_type: v.visit_type, reason: fullReason, deleted_by: user?.id ?? null })
+      await supabase.from('visit_deletions').insert({ visit_date: v.visit_date, school_id: v.school_id, technician_id: v.technician_id, slot: v.slot, visit_type: v.visit_type, reason: deleteReason, deleted_by: user?.id ?? null })
       await supabase.from('visits').delete().eq('id', v.id)
     }
     setVisits(prev => prev.filter(v => !toDelete.map(d => d.id).includes(v.id)))
@@ -333,7 +331,7 @@ export default function WeeklyPlannerPage() {
                   const inTerm = isInTerm(d.dateStr)
                   return (
                     <th key={d.key} className="px-1 py-2 font-medium text-center border-r border-gray-100 last:border-r-0"
-                      style={{ background: d.isToday ? BRAND_GREEN : bh ? '#fee2e2' : !inTerm ? '#f1f5f9' : undefined, color: d.isToday ? 'white' : bh ? '#991b1b' : !inTerm ? '#94a3b8' : '#374151' }}>
+                      style={{ width: 110, minWidth: 110, background: d.isToday ? BRAND_GREEN : bh ? '#fee2e2' : !inTerm ? '#f1f5f9' : undefined, color: d.isToday ? 'white' : bh ? '#991b1b' : !inTerm ? '#94a3b8' : '#374151' }}>
                       <div className="text-xs">{d.label}</div>
                       {bh && <div className="text-xs font-normal opacity-75 truncate" style={{ maxWidth: 100 }}>{bh.name}</div>}
                       {!bh && !inTerm && <div className="text-xs font-normal opacity-60">Holiday</div>}
@@ -407,7 +405,7 @@ export default function WeeklyPlannerPage() {
                               <div className="flex items-center gap-0.5 shrink-0">
                                 {visit.travel_warning && <span className="text-yellow-300">⚠</span>}
                                 {visit.status === 'completed' && <span>✓</span>}
-                                <button onClick={() => { setDeleteTarget(visit); setDeleteReason(''); setDeleteNotes('') }} className="opacity-40 hover:opacity-100 text-xs" title="Delete">✕</button>
+                                <button onClick={() => { setDeleteTarget(visit); setDeleteReason('') }} className="opacity-40 hover:opacity-100 text-xs" title="Delete">✕</button>
                               </div>
                             </div>
                           ) : (
@@ -558,18 +556,13 @@ export default function WeeklyPlannerPage() {
               {' · '}{deleteTarget.slot.toUpperCase()}
               {getFullDayMerge(deleteTarget.technician_id, deleteTarget.visit_date) ? ' · full day (both slots)' : ''}
             </p>
-            <div className="mb-3">
+            <div className="mb-4">
               <p className="text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></p>
               <select value={deleteReason} onChange={e => setDeleteReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900">
                 <option value="">Select a reason...</option>
                 {DELETE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-            </div>
-            <div className="mb-4">
-              <p className="text-xs font-medium text-gray-700 mb-1">Notes <span className="text-gray-400">(optional)</span></p>
-              <input type="text" value={deleteNotes} onChange={e => setDeleteNotes(e.target.value)} placeholder="Any additional detail..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
             </div>
             <div className="flex gap-2">
               <button onClick={handleDelete} disabled={deleting || !deleteReason}
