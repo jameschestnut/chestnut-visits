@@ -309,6 +309,10 @@ export default function WeeklyPlannerPage() {
           </div>
           <div className="flex items-center gap-2">
             {pending.length > 0 && <span className="text-xs text-amber-600">{pending.length} unsaved</span>}
+            <Link href="/admin/schedule/generate"
+              className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50">
+              + Generate
+            </Link>
             <button onClick={handleConfirm} disabled={pending.length === 0 || saving}
               className="px-4 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-30"
               style={{ background: BRAND_GREEN }}>
