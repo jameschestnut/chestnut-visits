@@ -101,6 +101,10 @@ export default function ScheduleGeneratePage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate]     = useState('')
 
+  // Frequency (defaults to contract frequency, overridable)
+  const [frequency, setFrequency] = useState('')
+  const [visitDuration, setVisitDuration] = useState('half_day')
+
   // Settings
   const [techId, setTechId]               = useState('')
   const [preferredDay, setPreferredDay]   = useState(1)
@@ -125,13 +129,16 @@ export default function ScheduleGeneratePage() {
         { data: holidayData },
       ] = await Promise.all([
         supabase.from('schools').select('id,name,short_name').eq('is_active', true).order('name'),
-        supabase.from('technicians').select('id,full_name,initials').eq('is_active', true).order('full_name'),
+        supabase.from('technicians').select('id,full_name,initials,is_active,leaving_date').order('full_name'),
         supabase.from('rota_calendar').select('week_start,tag_weekly,tag_fortnightly,tag_monthly').order('week_start'),
         supabase.from('term_dates').select('term_name,start_date,end_date').order('start_date'),
         supabase.from('bank_holidays').select('holiday_date'),
       ])
       setSchools(schoolData ?? [])
-      setTechnicians(techData ?? [])
+      const today2 = new Date().toISOString().split('T')[0]
+      setTechnicians((techData ?? []).filter((t: { is_active: boolean; leaving_date: string | null }) =>
+        t.is_active || (t.leaving_date && t.leaving_date >= today2)
+      ))
       setRotaCalendar(rotaData ?? [])
       setTermDates(termData ?? [])
       setBankHolidays(new Set((holidayData ?? []).map((h: { holiday_date: string }) => h.holiday_date)))
@@ -159,7 +166,8 @@ export default function ScheduleGeneratePage() {
     ]).then(([{ data: c }, { data: v }]) => {
       setContract(c ?? null)
       setExistingVisits(v ?? [])
-      // Reset tags when school changes
+      setFrequency(c?.frequency ?? '')
+      setVisitDuration(c?.visit_duration ?? 'half_day')
       setFortnightlyTag(null)
       setMonthlyTags([])
       setPreview(null)
@@ -196,11 +204,11 @@ export default function ScheduleGeneratePage() {
   }
 
   function needsFortnightlyTag() {
-    return ['fortnightly', 'one_point_five_weekly'].includes(contract?.frequency ?? '')
+    return ['fortnightly', 'one_point_five_weekly'].includes(frequency)
   }
 
   function needsMonthlyTags() {
-    return ['monthly', 'half_termly'].includes(contract?.frequency ?? '')
+    return ['monthly', 'half_termly'].includes(frequency)
   }
 
   function tagsReady() {
@@ -216,8 +224,8 @@ export default function ScheduleGeneratePage() {
     if (!techId || !startDate || !endDate || !schoolId) return
     setError(null)
 
-    const freq = contract?.frequency
-    const duration = contract?.visit_duration ?? 'half_day'
+    const freq = frequency
+    const duration = visitDuration
     const isManual = freq === 'termly' || freq === 'custom' || !freq
 
     if (isManual) {
@@ -311,11 +319,11 @@ export default function ScheduleGeneratePage() {
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
-  const freq       = contract?.frequency ?? ''
+  const freq       = frequency
   const isManual   = freq === 'termly' || freq === 'custom' || !freq
   const showDay    = !isManual && freq !== 'three_times_weekly'
-  const showSlot   = !isManual && freq !== 'twice_weekly' && freq !== 'three_times_weekly' && (contract?.visit_duration === 'half_day')
-  const canGenerate = !!schoolId && !!techId && !!startDate && !!endDate && tagsReady() && (!isManual || true)
+  const showSlot   = !isManual && freq !== 'twice_weekly' && freq !== 'three_times_weekly' && visitDuration === 'half_day'
+  const canGenerate = !!schoolId && !!techId && !!startDate && !!endDate && tagsReady()
 
   const confirmedCount = preview?.filter(v => !v.conflict).length ?? 0
   const conflictCount  = preview?.filter(v => v.conflict).length ?? 0
@@ -361,22 +369,34 @@ export default function ScheduleGeneratePage() {
             {schoolId && loadingContract && (
               <p className="text-xs text-gray-400">Loading contract…</p>
             )}
-            {schoolId && !loadingContract && contract && (
-              <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Frequency</span>
-                  <span className="font-medium">{FREQUENCY_LABELS[contract.frequency] ?? contract.frequency}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Duration</span>
-                  <span className="font-medium">{contract.visit_duration === 'half_day' ? 'Half day' : 'Full day'}</span>
-                </div>
-              </div>
-            )}
             {schoolId && !loadingContract && !contract && (
               <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                No active contract — dates will be set manually.
+                No active contract found — using manual settings.
               </p>
+            )}
+            {schoolId && !loadingContract && (
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+                  <select value={frequency}
+                    onChange={e => { setFrequency(e.target.value); setFortnightlyTag(null); setMonthlyTags([]); setPreview(null) }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                    <option value="">Manual (pick dates)</option>
+                    {Object.entries(FREQUENCY_LABELS).map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Duration</label>
+                  <select value={visitDuration}
+                    onChange={e => { setVisitDuration(e.target.value); setPreview(null) }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                    <option value="half_day">Half day</option>
+                    <option value="full_day">Full day</option>
+                  </select>
+                </div>
+              </div>
             )}
           </div>
 
@@ -467,16 +487,6 @@ export default function ScheduleGeneratePage() {
             )}
 
             {/* No contract — half-day manual slot */}
-            {!contract && (
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Slot</label>
-                <select value={preferredSlot} onChange={e => { setPreferredSlot(e.target.value); setPreview(null) }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
-                  {SLOT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </div>
-            )}
-
             {/* Fortnightly tag */}
             {needsFortnightlyTag() && (
               <div>
