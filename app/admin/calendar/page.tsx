@@ -271,20 +271,18 @@ export default function CalendarPage() {
     if (!editingTerm || !editingTerm.term_name.trim() || !editingTerm.start_date || !editingTerm.end_date) return
     setSavingTerm(true)
     if (editingTerm.id) {
-      const { error } = await supabase.from('term_dates').update({
+      await supabase.from('term_dates').update({
         term_name:  editingTerm.term_name.trim(),
         start_date: editingTerm.start_date,
         end_date:   editingTerm.end_date,
       }).eq('id', editingTerm.id)
-      if (error) { console.error('update term error:', error); setSavingTerm(false); return }
     } else {
-      const { data: region, error: regionErr } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
-      if (regionErr) console.warn('region lookup failed:', regionErr)
+      const { data: region } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
       const termMonth = new Date(editingTerm.start_date + 'T12:00:00').getMonth() + 1
       const termOrder = termMonth >= 9 ? 1 : termMonth <= 3 ? 2 : 3
       const msPerWeek = 7 * 24 * 60 * 60 * 1000
       const weekCount = Math.round((new Date(editingTerm.end_date + 'T12:00:00').getTime() - new Date(editingTerm.start_date + 'T12:00:00').getTime()) / msPerWeek) + 1
-      const { error } = await supabase.from('term_dates').insert({
+      await supabase.from('term_dates').insert({
         term_name:     editingTerm.term_name.trim(),
         start_date:    editingTerm.start_date,
         end_date:      editingTerm.end_date,
@@ -293,7 +291,6 @@ export default function CalendarPage() {
         term_order:    termOrder,
         week_count:    weekCount,
       })
-      if (error) { console.error('insert term error:', error); setSavingTerm(false); return }
     }
     setSavingTerm(false)
     setEditingTerm(null)
@@ -337,13 +334,13 @@ export default function CalendarPage() {
 
     const start  = getMonday(new Date(setupStartDate + 'T12:00:00'))
     const end    = new Date(setupEndDate + 'T12:00:00')
-    const rows: { week_start: string; academic_year: string }[] = []
+    const rows: { week_start: string; academic_year: string; rota_week: number; is_override: boolean }[] = []
 
     let current = new Date(start)
     while (current <= end) {
       if (isSchoolWeek(current)) {
         const weekStr = toStr(current)
-        rows.push({ week_start: weekStr, academic_year: getAcademicYear(weekStr) })
+        rows.push({ week_start: weekStr, academic_year: getAcademicYear(weekStr), rota_week: 0, is_override: false })
       }
       current = addDays(current, 7)
     }
@@ -1023,7 +1020,7 @@ export default function CalendarPage() {
           <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-96" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Set up rota calendar</h3>
             <p className="text-xs text-gray-400 mb-4">
-              Auto-numbers all school weeks in the date range, skipping holidays. You can override individual weeks afterwards.
+              Creates blank rows for all school weeks in the date range. Set rota tags manually in the Schedule Weeks tab afterwards.
             </p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
