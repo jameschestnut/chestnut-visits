@@ -106,7 +106,6 @@ export default function ScheduleGeneratePage() {
   const [preferredSlot, setPreferredSlot] = useState('am')
   const [fortnightlyTag, setFortnightlyTag] = useState<1 | 2 | null>(null)
   const [monthlyTags, setMonthlyTags]     = useState<number[]>([])
-  const [manualDates, setManualDates]     = useState<string[]>([''])
 
   // Output
   const [preview, setPreview] = useState<GeneratedVisit[] | null>(null)
@@ -217,30 +216,11 @@ export default function ScheduleGeneratePage() {
   // ── Generate ───────────────────────────────────────────────────────────────
 
   function generatePreview() {
-    if (!techId || !startDate || !endDate || !schoolId) return
+    if (!techId || !startDate || !endDate || !schoolId || !frequency) return
     setError(null)
 
-    const freq = frequency
+    const freq     = frequency
     const duration = visitDuration
-    const isManual = freq === 'termly' || freq === 'custom' || !freq
-
-    if (isManual) {
-      const visits: GeneratedVisit[] = []
-      for (const ds of manualDates) {
-        if (!ds) continue
-        visits.push({
-          date:       ds,
-          slot:       duration === 'full_day' ? 'full_day' : preferredSlot,
-          termName:   getTermName(ds),
-          bhAdjusted: false,
-          conflict:   hasConflict(ds, preferredSlot, techId),
-        })
-      }
-      if (visits.length === 0) { setError('Add at least one visit date.'); return }
-      setPreview(visits)
-      return
-    }
-
     const visits: GeneratedVisit[] = []
     const rangeStart = new Date(startDate + 'T12:00:00')
     const rangeEnd   = new Date(endDate   + 'T12:00:00')
@@ -316,10 +296,9 @@ export default function ScheduleGeneratePage() {
   // ── Derived state ──────────────────────────────────────────────────────────
 
   const freq        = frequency
-  const isManual    = !freq
-  const showDay     = !isManual
-  const showSlot    = !isManual && visitDuration === 'half_day'
-  const canGenerate = !!schoolId && !!techId && !!startDate && !!endDate && tagsReady()
+  const showDay     = !!freq
+  const showSlot    = !!freq && visitDuration === 'half_day'
+  const canGenerate = !!schoolId && !!techId && !!freq && !!startDate && !!endDate && tagsReady()
 
   const confirmedCount = preview?.filter(v => !v.conflict).length ?? 0
   const conflictCount  = preview?.filter(v => v.conflict).length ?? 0
@@ -377,7 +356,7 @@ export default function ScheduleGeneratePage() {
                   <select value={frequency}
                     onChange={e => { setFrequency(e.target.value); setFortnightlyTag(null); setMonthlyTags([]); setPreview(null) }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
-                    <option value="">Select dates manually</option>
+                    <option value="">Select…</option>
                     {FREQUENCY_OPTIONS.map(o => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
@@ -516,30 +495,7 @@ export default function ScheduleGeneratePage() {
               </div>
             )}
 
-            {/* Manual dates (termly / custom / no contract) */}
-            {isManual && (
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">Visit dates</label>
-                <div className="space-y-2">
-                  {manualDates.map((d, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input type="date" value={d}
-                        onChange={e => {
-                          const next = [...manualDates]; next[i] = e.target.value
-                          setManualDates(next); setPreview(null)
-                        }}
-                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-                      {manualDates.length > 1 && (
-                        <button onClick={() => { setManualDates(manualDates.filter((_,j) => j !== i)); setPreview(null) }}
-                          className="text-gray-300 hover:text-gray-600 text-lg leading-none">×</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setManualDates([...manualDates, ''])}
-                  className="mt-2 text-xs text-gray-400 hover:text-gray-700">+ Add date</button>
-              </div>
-            )}
+
 
             <button onClick={generatePreview} disabled={!canGenerate}
               className="w-full py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40"
