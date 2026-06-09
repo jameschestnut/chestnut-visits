@@ -277,10 +277,12 @@ export default function CalendarPage() {
         end_date:   editingTerm.end_date,
       }).eq('id', editingTerm.id)
     } else {
+      const { data: region } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
       await supabase.from('term_dates').insert({
         term_name:  editingTerm.term_name.trim(),
         start_date: editingTerm.start_date,
         end_date:   editingTerm.end_date,
+        region_id:  region?.id,
       })
     }
     setSavingTerm(false)
