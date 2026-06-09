@@ -182,20 +182,23 @@ export default async function TechnicianProfilePage({
           </dl>
 
           {isLeaver ? (
-            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
-              <p className="text-sm font-medium text-orange-800">
-                Leaving on {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-              <p className="text-xs text-orange-600 mt-1">
-                All confirmed visits from that date have been banked for reassignment.
-              </p>
+            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-orange-800">
+                  Leaving on {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-xs text-orange-600 mt-1">
+                  All confirmed visits from that date have been banked for reassignment.
+                </p>
+              </div>
+              <MarkAsLeaverButton techId={id} techName={tech.full_name} isLeaver={isLeaver} />
             </div>
           ) : (
             <div>
               <p className="text-xs text-gray-400 mb-3">
                 Marking as a leaver will bank all future confirmed visits from the leaving date onwards.
               </p>
-              <MarkAsLeaverButton techId={id} techName={tech.full_name} />
+              <MarkAsLeaverButton techId={id} techName={tech.full_name} isLeaver={isLeaver} />
             </div>
           )}
         </div>
