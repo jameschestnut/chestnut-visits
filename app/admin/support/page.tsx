@@ -255,46 +255,39 @@ export default function SupportRotaPage() {
                       <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: group.colour }} />
                       <span className="font-semibold text-gray-800">{group.label}</span>
                     </div>
-                    <div className="text-gray-400 text-xs">{group.hours}</div>
+                    <div className="text-gray-400">{group.hours}</div>
+                    <div className="text-gray-300 mt-0.5">Lunch {group.slots.find(s => s.label === 'Lunch')?.hours}</div>
                   </td>
 
                   {/* Day cells */}
                   {weekDates.map(d => (
                     <td key={d.key} className="px-3 py-3 border-r border-gray-100 last:border-r-0 align-top">
-                      <div className="space-y-2">
-                        {group.slots.map(slot => {
-                          const isLunch = slot.label === 'Lunch'
+                      <div className="space-y-3">
+                        {group.slots.filter(s => s.label !== 'Lunch').map(slot => {
                           const entries = getEntries(d.dateStr, slot.key)
                           return (
                             <div key={slot.key}>
-                              <div className="flex items-center gap-1 mb-1">
-                                <span className="font-medium text-gray-500">{slot.label}</span>
-                                <span className="text-gray-300">{slot.hours}</span>
+                              <div className="text-gray-400 mb-1">{slot.label} <span className="text-gray-300">{slot.hours}</span></div>
+                              <div className="space-y-1">
+                                {entries.map(e => {
+                                  const tech = technicians.find(t => t.id === e.technician_id)
+                                  if (!tech) return null
+                                  return (
+                                    <div key={e.id}
+                                      className="flex items-center gap-1 px-2 py-1 rounded-md font-medium"
+                                      style={{ background: group.lightBg, color: group.colour, border: `1px solid ${group.border}` }}>
+                                      <span className="truncate">{tech.full_name.split(' ')[0]}</span>
+                                      <button onClick={() => removeEntry(e.id)} disabled={saving}
+                                        className="ml-auto shrink-0 opacity-40 hover:opacity-100 leading-none">×</button>
+                                    </div>
+                                  )
+                                })}
+                                <button
+                                  onClick={() => setPopover({ dateStr: d.dateStr, slotKey: slot.key, tier: group.tier, groupKey: group.key })}
+                                  className="w-full text-left px-2 py-1 rounded-md border border-dashed border-gray-200 text-gray-300 hover:border-gray-400 hover:text-gray-500 transition-colors">
+                                  + Add
+                                </button>
                               </div>
-                              {isLunch ? (
-                                <div className="text-gray-300 italic pl-0.5">staggered</div>
-                              ) : (
-                                <div className="space-y-1">
-                                  {entries.map(e => {
-                                    const tech = technicians.find(t => t.id === e.technician_id)
-                                    if (!tech) return null
-                                    return (
-                                      <div key={e.id}
-                                        className="flex items-center gap-1 px-2 py-1 rounded-md font-medium"
-                                        style={{ background: group.lightBg, color: group.colour, border: `1px solid ${group.border}` }}>
-                                        <span className="truncate">{tech.full_name.split(' ')[0]}</span>
-                                        <button onClick={() => removeEntry(e.id)} disabled={saving}
-                                          className="ml-auto shrink-0 opacity-40 hover:opacity-100 leading-none">×</button>
-                                      </div>
-                                    )
-                                  })}
-                                  <button
-                                    onClick={() => setPopover({ dateStr: d.dateStr, slotKey: slot.key, tier: group.tier, groupKey: group.key })}
-                                    className="w-full text-left px-2 py-1 rounded-md border border-dashed border-gray-200 text-gray-300 hover:border-gray-400 hover:text-gray-500 transition-colors">
-                                    + Add
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           )
                         })}
