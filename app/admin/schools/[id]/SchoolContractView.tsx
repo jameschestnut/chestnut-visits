@@ -150,9 +150,10 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
     setDeleteInProgress(false)
   }
 
-  const completed  = contractVisits.filter(v => v.status === 'completed').length
-  const banked     = contractVisits.filter(v => v.status === 'banked').length
-  const total      = contractVisits.length
+  const tpVisits   = contractVisits.filter(v => v.visit_type === 'technology_partner')
+  const completed  = tpVisits.filter(v => v.status === 'completed').length
+  const banked     = tpVisits.filter(v => v.status === 'banked').length
+  const total      = tpVisits.length
   const remaining  = total - completed - banked
 
   return (
@@ -385,7 +386,10 @@ export default function SchoolContractView({ schoolId, contracts, allVisits, con
 
         {/* Visit stats */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Visit summary</h2>
+          <div className="flex items-baseline gap-2 mb-4">
+            <h2 className="text-sm font-semibold text-gray-700">Visit summary</h2>
+            <span className="text-xs text-gray-400">TP visits only</span>
+          </div>
           {selected && total > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">

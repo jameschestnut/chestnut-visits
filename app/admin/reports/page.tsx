@@ -662,7 +662,13 @@ function SchoolVisitHistory({ start, end }: { start: string; end: string }) {
       {!loading && searched && (
         <>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-gray-500">{rows.length} visit{rows.length !== 1 ? 's' : ''} in period</p>
+            <p className="text-xs text-gray-500">
+              {rows.filter(r => r.visit_type === 'technology_partner').length} TP visit{rows.filter(r => r.visit_type === 'technology_partner').length !== 1 ? 's' : ''}
+              {rows.filter(r => r.visit_type !== 'technology_partner').length > 0 && (
+                <span className="text-gray-400"> · {rows.filter(r => r.visit_type !== 'technology_partner').length} other</span>
+              )}
+              <span className="text-gray-400"> in period</span>
+            </p>
             {rows.length > 0 && (
               <button onClick={exportCsv} className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50">↓ Export CSV</button>
             )}
