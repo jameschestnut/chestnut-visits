@@ -345,8 +345,12 @@ export default function CalendarPage() {
       current = addDays(current, 7)
     }
 
+    console.log('generateRota: rows to upsert:', rows.length, rows)
     if (rows.length > 0) {
-      await supabase.from('rota_calendar').upsert(rows, { onConflict: 'week_start' })
+      const { error } = await supabase.from('rota_calendar').upsert(rows, { onConflict: 'week_start' })
+      if (error) { console.error('rota upsert error:', error); setGenerating(false); return }
+    } else {
+      console.warn('generateRota: no rows generated — check term dates cover this range')
     }
 
     setGenerating(false)
