@@ -100,7 +100,7 @@ export default function CalendarPage() {
   const [showSetup, setShowSetup]           = useState(false)
   const [setupStartDate, setSetupStartDate] = useState('')
   const [setupEndDate, setSetupEndDate]     = useState('')
-  const [setupStartRota, setSetupStartRota] = useState(1)
+
   const [generating, setGenerating]         = useState(false)
 
   // ── Load data ──────────────────────────────────────────────────────────────
@@ -325,21 +325,13 @@ export default function CalendarPage() {
 
     const start  = getMonday(new Date(setupStartDate + 'T12:00:00'))
     const end    = new Date(setupEndDate + 'T12:00:00')
-    const rows: { week_start: string; rota_week: number; academic_year: string; is_override: boolean }[] = []
+    const rows: { week_start: string; academic_year: string }[] = []
 
     let current = new Date(start)
-    let rotaNum = setupStartRota - 1
-
     while (current <= end) {
       if (isSchoolWeek(current)) {
-        rotaNum = (rotaNum % 6) + 1
         const weekStr = toStr(current)
-        rows.push({
-          week_start:    weekStr,
-          rota_week:     rotaNum,
-          academic_year: getAcademicYear(weekStr),
-          is_override:   false,
-        })
+        rows.push({ week_start: weekStr, academic_year: getAcademicYear(weekStr) })
       }
       current = addDays(current, 7)
     }
@@ -1034,20 +1026,6 @@ export default function CalendarPage() {
                   <input type="date" value={setupEndDate}
                     onChange={e => setSetupEndDate(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  First school week in this range is rota week...
-                </label>
-                <div className="flex gap-2">
-                  {[1,2,3,4,5,6].map(w => (
-                    <button key={w} onClick={() => setSetupStartRota(w)}
-                      className="flex-1 h-9 rounded-lg text-sm font-bold text-white transition-opacity"
-                      style={{ background: ROTA_COLOURS[w], opacity: setupStartRota === w ? 1 : 0.25 }}>
-                      {w}
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>
