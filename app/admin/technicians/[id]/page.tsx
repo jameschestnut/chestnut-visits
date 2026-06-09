@@ -47,6 +47,16 @@ export default async function TechnicianProfilePage({
               {tech.job_title && (
                 <p className="text-sm text-gray-500 mt-0.5">{tech.job_title}</p>
               )}
+              {((tech.support_tiers ?? []).length > 0) && (
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  {(tech.support_tiers ?? []).includes('first_line') && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-100">1st Line</span>
+                  )}
+                  {(tech.support_tiers ?? []).includes('second_line') && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-100">2nd Line</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${

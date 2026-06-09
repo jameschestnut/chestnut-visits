@@ -147,6 +147,13 @@ export default function SupportRotaPage() {
     return busyTechs.some(v => v.technician_id === techId && v.visit_date === dateStr)
   }
 
+  function hasShiftConflict(techId: string, dateStr: string, groupKey: string): boolean {
+    const conflictingGroup = groupKey === 'first_early' ? 'first_late' : groupKey === 'first_late' ? 'first_early' : null
+    if (!conflictingGroup) return false
+    const conflictSlotKeys = SHIFT_GROUPS.find(g => g.key === conflictingGroup)?.slots.map(s => s.key) ?? []
+    return rota.some(r => r.technician_id === techId && r.rota_date === dateStr && conflictSlotKeys.includes(r.shift_type))
+  }
+
   function isAssigned(techId: string, dateStr: string, slotKey: string): boolean {
     return rota.some(r => r.technician_id === techId && r.rota_date === dateStr && r.shift_type === slotKey)
   }
@@ -320,7 +327,9 @@ export default function SupportRotaPage() {
               const slot     = ALL_SLOTS.find(s => s.key === popover.slotKey)!
               const day      = weekDates.find(d => d.dateStr === popover.dateStr)!
               const eligible = technicians.filter(t =>
-                (t.support_tiers ?? []).includes(popover.tier) && !isBusy(t.id, popover.dateStr)
+                (t.support_tiers ?? []).includes(popover.tier) &&
+                !isBusy(t.id, popover.dateStr) &&
+                !hasShiftConflict(t.id, popover.dateStr, popover.groupKey)
               )
               return (
                 <>
