@@ -271,19 +271,22 @@ export default function CalendarPage() {
     if (!editingTerm || !editingTerm.term_name.trim() || !editingTerm.start_date || !editingTerm.end_date) return
     setSavingTerm(true)
     if (editingTerm.id) {
-      await supabase.from('term_dates').update({
+      const { error } = await supabase.from('term_dates').update({
         term_name:  editingTerm.term_name.trim(),
         start_date: editingTerm.start_date,
         end_date:   editingTerm.end_date,
       }).eq('id', editingTerm.id)
+      if (error) { console.error('update term error:', error); setSavingTerm(false); return }
     } else {
-      const { data: region } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
-      await supabase.from('term_dates').insert({
+      const { data: region, error: regionErr } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
+      if (regionErr) console.warn('region lookup failed:', regionErr)
+      const { error } = await supabase.from('term_dates').insert({
         term_name:  editingTerm.term_name.trim(),
         start_date: editingTerm.start_date,
         end_date:   editingTerm.end_date,
         region_id:  region?.id,
       })
+      if (error) { console.error('insert term error:', error); setSavingTerm(false); return }
     }
     setSavingTerm(false)
     setEditingTerm(null)
