@@ -18,17 +18,12 @@ const SLOT_OPTIONS = [
   { value: 'pm', label: 'PM (13:00–17:00)' },
 ]
 
-const FREQUENCY_LABELS: Record<string, string> = {
-  weekly:                'Weekly',
-  one_point_five_weekly: '1.5× Weekly',
-  twice_weekly:          '2× Weekly',
-  three_times_weekly:    '3× Weekly',
-  fortnightly:           'Fortnightly',
-  monthly:               'Monthly',
-  half_termly:           'Half-termly',
-  termly:                'Termly',
-  custom:                'Custom',
-}
+const FREQUENCY_OPTIONS = [
+  { value: 'weekly',      label: 'Weekly',      description: 'Every term week' },
+  { value: 'fortnightly', label: 'Fortnightly',  description: 'Every other term week' },
+  { value: 'monthly',     label: 'Monthly',      description: 'Specific monthly slots' },
+  { value: 'half_termly', label: 'Half-termly',  description: 'One per half-term' },
+]
 
 interface School { id: string; name: string; short_name: string | null }
 interface Contract {
@@ -166,7 +161,8 @@ export default function ScheduleGeneratePage() {
     ]).then(([{ data: c }, { data: v }]) => {
       setContract(c ?? null)
       setExistingVisits(v ?? [])
-      setFrequency(c?.frequency ?? '')
+      const supportedFreqs = FREQUENCY_OPTIONS.map(o => o.value)
+      setFrequency(c?.frequency && supportedFreqs.includes(c.frequency) ? c.frequency : '')
       setVisitDuration(c?.visit_duration ?? 'half_day')
       setFortnightlyTag(null)
       setMonthlyTags([])
@@ -319,10 +315,10 @@ export default function ScheduleGeneratePage() {
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
-  const freq       = frequency
-  const isManual   = freq === 'termly' || freq === 'custom' || !freq
-  const showDay    = !isManual && freq !== 'three_times_weekly'
-  const showSlot   = !isManual && freq !== 'twice_weekly' && freq !== 'three_times_weekly' && visitDuration === 'half_day'
+  const freq        = frequency
+  const isManual    = !freq
+  const showDay     = !isManual
+  const showSlot    = !isManual && visitDuration === 'half_day'
   const canGenerate = !!schoolId && !!techId && !!startDate && !!endDate && tagsReady()
 
   const confirmedCount = preview?.filter(v => !v.conflict).length ?? 0
@@ -381,9 +377,9 @@ export default function ScheduleGeneratePage() {
                   <select value={frequency}
                     onChange={e => { setFrequency(e.target.value); setFortnightlyTag(null); setMonthlyTags([]); setPreview(null) }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
-                    <option value="">Manual (pick dates)</option>
-                    {Object.entries(FREQUENCY_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
+                    <option value="">Select dates manually</option>
+                    {FREQUENCY_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
@@ -459,30 +455,13 @@ export default function ScheduleGeneratePage() {
               </div>
             )}
 
-            {freq === 'three_times_weekly' && (
-              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-                Visits on Monday, Wednesday and Friday each term week.
-              </p>
-            )}
-
-            {freq === 'twice_weekly' && (
-              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-                Full-day visit every term week.
-              </p>
-            )}
-
             {showSlot && (
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  {freq === 'one_point_five_weekly' ? 'Alternate week slot' : 'Slot'}
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Slot</label>
                 <select value={preferredSlot} onChange={e => { setPreferredSlot(e.target.value); setPreview(null) }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
                   {SLOT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
-                {freq === 'one_point_five_weekly' && (
-                  <p className="text-xs text-gray-400 mt-1">Fortnightly weeks will be full day.</p>
-                )}
               </div>
             )}
 
