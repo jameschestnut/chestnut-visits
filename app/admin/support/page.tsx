@@ -232,14 +232,13 @@ export default function SupportRotaPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-          <table className="border-collapse text-xs" style={{ minWidth: 720, width: '100%' }}>
+          <table className="border-collapse text-xs" style={{ minWidth: 700, width: '100%' }}>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-3 py-3 font-medium text-gray-500 border-r border-gray-100" style={{ width: 150, minWidth: 150 }}>Shift</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 border-r border-gray-100" style={{ width: 100, minWidth: 100 }}>Slot</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 border-r border-gray-100" style={{ width: 160, minWidth: 160 }}>Shift</th>
                 {weekDates.map(d => (
-                  <th key={d.key} className="px-2 py-3 font-medium text-center border-r border-gray-100 last:border-r-0" style={{ width: 130, minWidth: 130 }}>
-                    <span className={d.isToday ? 'text-white px-2 py-0.5 rounded-full text-xs' : 'text-gray-500 text-xs'}
+                  <th key={d.key} className="px-3 py-3 font-medium text-center border-r border-gray-100 last:border-r-0" style={{ minWidth: 150 }}>
+                    <span className={d.isToday ? 'text-white px-2 py-0.5 rounded-full' : 'text-gray-500'}
                       style={d.isToday ? { background: '#46DA26' } : {}}>
                       {d.label}
                     </span>
@@ -248,61 +247,62 @@ export default function SupportRotaPage() {
               </tr>
             </thead>
             <tbody>
-              {SHIFT_GROUPS.map(group =>
-                group.slots.map((slot, si) => {
-                  const isLunch = slot.label === 'Lunch'
-                  return (
-                    <tr key={slot.key} className={`border-b border-gray-100 last:border-b-0 ${isLunch ? 'bg-gray-50/60' : ''}`}>
-                      {si === 0 && (
-                        <td className="px-3 py-2 border-r border-gray-100 align-middle" rowSpan={3}>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: group.colour }} />
-                            <div>
-                              <div className="font-medium text-gray-700">{group.label}</div>
-                              <div className="text-gray-400">{group.hours}</div>
-                            </div>
-                          </div>
-                        </td>
-                      )}
-                      <td className="px-3 py-2 border-r border-gray-100 align-top">
-                        <div className="font-medium text-gray-600">{slot.label}</div>
-                        <div className="text-gray-400">{slot.hours}</div>
-                      </td>
-                      {weekDates.map(d => {
-                        const entries = getEntries(d.dateStr, slot.key)
-                        return (
-                          <td key={d.key} className="px-2 py-2 border-r border-gray-100 last:border-r-0 align-top">
-                            {isLunch ? (
-                              <span className="text-gray-300 italic">staggered</span>
-                            ) : (
-                              <div className="space-y-1">
-                                {entries.map(e => {
-                                  const tech = technicians.find(t => t.id === e.technician_id)
-                                  if (!tech) return null
-                                  return (
-                                    <div key={e.id}
-                                      className="flex items-center gap-1 px-2 py-1 rounded-md font-medium"
-                                      style={{ background: group.lightBg, color: group.colour, border: `1px solid ${group.border}` }}>
-                                      <span className="truncate">{tech.full_name.split(' ')[0]}</span>
-                                      <button onClick={() => removeEntry(e.id)} disabled={saving}
-                                        className="ml-auto shrink-0 opacity-40 hover:opacity-100 leading-none">×</button>
-                                    </div>
-                                  )
-                                })}
-                                <button
-                                  onClick={() => setPopover({ dateStr: d.dateStr, slotKey: slot.key, tier: group.tier, groupKey: group.key })}
-                                  className="w-full text-left px-2 py-1 rounded-md border border-dashed border-gray-200 text-gray-300 hover:border-gray-400 hover:text-gray-500 transition-colors">
-                                  + Add
-                                </button>
+              {SHIFT_GROUPS.map((group, gi) => (
+                <tr key={group.key} className={`border-b border-gray-100 last:border-b-0 ${gi % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                  {/* Shift label */}
+                  <td className="px-4 py-3 border-r border-gray-100 align-top">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: group.colour }} />
+                      <span className="font-semibold text-gray-800">{group.label}</span>
+                    </div>
+                    <div className="text-gray-400 text-xs">{group.hours}</div>
+                  </td>
+
+                  {/* Day cells */}
+                  {weekDates.map(d => (
+                    <td key={d.key} className="px-3 py-3 border-r border-gray-100 last:border-r-0 align-top">
+                      <div className="space-y-2">
+                        {group.slots.map(slot => {
+                          const isLunch = slot.label === 'Lunch'
+                          const entries = getEntries(d.dateStr, slot.key)
+                          return (
+                            <div key={slot.key}>
+                              <div className="flex items-center gap-1 mb-1">
+                                <span className="font-medium text-gray-500">{slot.label}</span>
+                                <span className="text-gray-300">{slot.hours}</span>
                               </div>
-                            )}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  )
-                })
-              )}
+                              {isLunch ? (
+                                <div className="text-gray-300 italic pl-0.5">staggered</div>
+                              ) : (
+                                <div className="space-y-1">
+                                  {entries.map(e => {
+                                    const tech = technicians.find(t => t.id === e.technician_id)
+                                    if (!tech) return null
+                                    return (
+                                      <div key={e.id}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md font-medium"
+                                        style={{ background: group.lightBg, color: group.colour, border: `1px solid ${group.border}` }}>
+                                        <span className="truncate">{tech.full_name.split(' ')[0]}</span>
+                                        <button onClick={() => removeEntry(e.id)} disabled={saving}
+                                          className="ml-auto shrink-0 opacity-40 hover:opacity-100 leading-none">×</button>
+                                      </div>
+                                    )
+                                  })}
+                                  <button
+                                    onClick={() => setPopover({ dateStr: d.dateStr, slotKey: slot.key, tier: group.tier, groupKey: group.key })}
+                                    className="w-full text-left px-2 py-1 rounded-md border border-dashed border-gray-200 text-gray-300 hover:border-gray-400 hover:text-gray-500 transition-colors">
+                                    + Add
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
