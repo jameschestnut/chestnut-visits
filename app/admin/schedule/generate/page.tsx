@@ -42,7 +42,7 @@ interface RotaWeek {
 interface TermDate { term_name: string; start_date: string; end_date: string }
 interface GeneratedVisit {
   date: string; slot: string; termName: string
-  bhAdjusted: boolean; conflict: boolean
+  banked: boolean; bankReason: string | null; conflict: boolean
 }
 
 function toStr(d: Date) {
@@ -91,6 +91,7 @@ export default function ScheduleGeneratePage() {
   const [contract, setContract]   = useState<Contract | null>(null)
   const [loadingContract, setLoadingContract] = useState(false)
   const [existingVisits, setExistingVisits]   = useState<{ visit_date: string; slot: string; technician_id: string }[]>([])
+  const [schoolClosures, setSchoolClosures]   = useState<Set<string>>(new Set())
 
   // Timeframe
   const [startDate, setStartDate] = useState('')
@@ -157,9 +158,13 @@ export default function ScheduleGeneratePage() {
       supabase.from('visits')
         .select('visit_date,slot,technician_id')
         .eq('school_id', schoolId),
-    ]).then(([{ data: c }, { data: v }]) => {
+      supabase.from('school_closures')
+        .select('closure_date')
+        .eq('school_id', schoolId),
+    ]).then(([{ data: c }, { data: v }, { data: cl }]) => {
       setContract(c ?? null)
       setExistingVisits(v ?? [])
+      setSchoolClosures(new Set((cl ?? []).map((r: { closure_date: string }) => r.closure_date)))
       const supportedFreqs = FREQUENCY_OPTIONS.map(o => o.value)
       setFrequency(c?.frequency && supportedFreqs.includes(c.frequency) ? c.frequency : '')
       setVisitDuration(c?.visit_duration ?? 'half_day')
@@ -188,14 +193,10 @@ export default function ScheduleGeneratePage() {
     )
   }
 
-  function resolveDate(weekStart: Date, dayOffset: number): { date: string; bhAdjusted: boolean } {
-    const d = addDays(weekStart, dayOffset)
-    const dStr = toStr(d)
-    if (bankHolidays.has(dStr)) {
-      const tue = addDays(weekStart, dayOffset === 0 ? 1 : dayOffset + 1)
-      return { date: toStr(tue), bhAdjusted: true }
-    }
-    return { date: dStr, bhAdjusted: false }
+  function getBankReason(dateStr: string): string | null {
+    if (bankHolidays.has(dateStr)) return 'Bank holiday'
+    if (schoolClosures.has(dateStr)) return 'INSET day'
+    return null
   }
 
   function needsFortnightlyTag() {
@@ -236,13 +237,15 @@ export default function ScheduleGeneratePage() {
       if (!rota || !isTermTime(wsStr)) { weekStart = addDays(weekStart, 7); continue }
 
       const addVisit = (offset: number, s: string) => {
-        const { date, bhAdjusted } = resolveDate(weekStart, offset)
+        const date = toStr(addDays(weekStart, offset))
         if (date < startDate || date > endDate) return
+        const bankReason = getBankReason(date)
         visits.push({
           date, slot: s,
           termName:   getTermName(date),
-          bhAdjusted,
-          conflict:   hasConflict(date, s, techId),
+          banked:     bankReason !== null,
+          bankReason,
+          conflict:   !bankReason && hasConflict(date, s, techId),
         })
       }
 
@@ -283,9 +286,9 @@ export default function ScheduleGeneratePage() {
         contract_id:   contract?.id ?? null,
         visit_date:    v.date,
         slot:          v.slot,
-        status:        'confirmed',
+        status:        v.banked ? 'banked' : 'confirmed',
         visit_type:    'technology_partner',
-        notes:         v.bhAdjusted ? 'Moved from bank holiday Monday' : null,
+        notes:         v.bankReason ?? null,
       }))
     )
 
@@ -300,9 +303,9 @@ export default function ScheduleGeneratePage() {
   const showSlot    = !!freq && visitDuration === 'half_day'
   const canGenerate = !!schoolId && !!techId && !!freq && !!startDate && !!endDate && tagsReady()
 
-  const confirmedCount = preview?.filter(v => !v.conflict).length ?? 0
+  const confirmedCount = preview?.filter(v => !v.conflict && !v.banked).length ?? 0
   const conflictCount  = preview?.filter(v => v.conflict).length ?? 0
-  const adjustedCount  = preview?.filter(v => v.bhAdjusted).length ?? 0
+  const bankedCount    = preview?.filter(v => v.banked).length ?? 0
 
   const presets = getDatePresets(contract)
 
@@ -524,9 +527,9 @@ export default function ScheduleGeneratePage() {
                   <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                     {confirmedCount} to confirm
                   </span>
-                  {adjustedCount > 0 && (
-                    <span className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                      {adjustedCount} BH adjusted
+                  {bankedCount > 0 && (
+                    <span className="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
+                      {bankedCount} banked
                     </span>
                   )}
                   {conflictCount > 0 && (
@@ -545,7 +548,7 @@ export default function ScheduleGeneratePage() {
               <div className="divide-y divide-gray-50 max-h-[560px] overflow-auto">
                 {preview.map((v, i) => (
                   <div key={i} className={`flex items-center gap-3 px-4 py-2.5 text-sm ${
-                    v.conflict ? 'bg-amber-50' : v.bhAdjusted ? 'bg-blue-50/40' : ''
+                    v.conflict ? 'bg-amber-50' : v.banked ? 'bg-purple-50/40' : ''
                   }`}>
                     <span className="text-gray-300 w-5 text-xs text-right shrink-0">{i + 1}</span>
                     <span className="font-medium text-gray-900 w-20 shrink-0">
@@ -562,7 +565,7 @@ export default function ScheduleGeneratePage() {
                       {v.slot === 'full_day' ? 'Full' : v.slot.toUpperCase()}
                     </span>
                     <span className="text-gray-500 text-xs flex-1 truncate">{v.termName}</span>
-                    {v.bhAdjusted && <span className="text-xs text-blue-500 shrink-0">BH → Tue</span>}
+                    {v.banked && <span className="text-xs text-purple-500 shrink-0">{v.bankReason}</span>}
                     {v.conflict && <span className="text-xs text-amber-600 font-medium shrink-0">⚠ clash</span>}
                   </div>
                 ))}
