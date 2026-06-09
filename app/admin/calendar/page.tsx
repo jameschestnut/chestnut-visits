@@ -280,12 +280,15 @@ export default function CalendarPage() {
     } else {
       const { data: region, error: regionErr } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
       if (regionErr) console.warn('region lookup failed:', regionErr)
+      const termMonth = new Date(editingTerm.start_date + 'T12:00:00').getMonth() + 1
+      const termOrder = termMonth >= 9 ? 1 : termMonth <= 3 ? 2 : 3
       const { error } = await supabase.from('term_dates').insert({
         term_name:     editingTerm.term_name.trim(),
         start_date:    editingTerm.start_date,
         end_date:      editingTerm.end_date,
         region_id:     region?.id,
         academic_year: getAcademicYear(editingTerm.start_date),
+        term_order:    termOrder,
       })
       if (error) { console.error('insert term error:', error); setSavingTerm(false); return }
     }
