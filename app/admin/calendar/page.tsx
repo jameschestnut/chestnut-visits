@@ -282,6 +282,8 @@ export default function CalendarPage() {
       if (regionErr) console.warn('region lookup failed:', regionErr)
       const termMonth = new Date(editingTerm.start_date + 'T12:00:00').getMonth() + 1
       const termOrder = termMonth >= 9 ? 1 : termMonth <= 3 ? 2 : 3
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000
+      const weekCount = Math.round((new Date(editingTerm.end_date + 'T12:00:00').getTime() - new Date(editingTerm.start_date + 'T12:00:00').getTime()) / msPerWeek) + 1
       const { error } = await supabase.from('term_dates').insert({
         term_name:     editingTerm.term_name.trim(),
         start_date:    editingTerm.start_date,
@@ -289,6 +291,7 @@ export default function CalendarPage() {
         region_id:     region?.id,
         academic_year: getAcademicYear(editingTerm.start_date),
         term_order:    termOrder,
+        week_count:    weekCount,
       })
       if (error) { console.error('insert term error:', error); setSavingTerm(false); return }
     }
