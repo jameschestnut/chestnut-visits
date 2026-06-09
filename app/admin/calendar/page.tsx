@@ -334,23 +334,19 @@ export default function CalendarPage() {
 
     const start  = getMonday(new Date(setupStartDate + 'T12:00:00'))
     const end    = new Date(setupEndDate + 'T12:00:00')
-    const rows: { week_start: string; academic_year: string; rota_week: number; is_override: boolean }[] = []
+    const rows: { week_start: string; academic_year: string; rota_week: null; is_override: boolean }[] = []
 
     let current = new Date(start)
     while (current <= end) {
       if (isSchoolWeek(current)) {
         const weekStr = toStr(current)
-        rows.push({ week_start: weekStr, academic_year: getAcademicYear(weekStr), rota_week: 0, is_override: false })
+        rows.push({ week_start: weekStr, academic_year: getAcademicYear(weekStr), rota_week: null, is_override: false })
       }
       current = addDays(current, 7)
     }
 
-    console.log('generateRota: rows to upsert:', rows.length, rows)
     if (rows.length > 0) {
-      const { error } = await supabase.from('rota_calendar').upsert(rows, { onConflict: 'week_start' })
-      if (error) { console.error('rota upsert error:', error); setGenerating(false); return }
-    } else {
-      console.warn('generateRota: no rows generated — check term dates cover this range')
+      await supabase.from('rota_calendar').upsert(rows, { onConflict: 'week_start' })
     }
 
     setGenerating(false)
