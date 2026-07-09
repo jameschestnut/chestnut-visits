@@ -47,6 +47,16 @@ export default async function TechnicianProfilePage({
               {tech.job_title && (
                 <p className="text-sm text-gray-500 mt-0.5">{tech.job_title}</p>
               )}
+              {((tech.support_tiers ?? []).length > 0) && (
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  {(tech.support_tiers ?? []).includes('first_line') && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-100">1st Line</span>
+                  )}
+                  {(tech.support_tiers ?? []).includes('second_line') && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-100">2nd Line</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -172,20 +182,23 @@ export default async function TechnicianProfilePage({
           </dl>
 
           {isLeaver ? (
-            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
-              <p className="text-sm font-medium text-orange-800">
-                Leaving on {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-              <p className="text-xs text-orange-600 mt-1">
-                All confirmed visits from that date have been banked for reassignment.
-              </p>
+            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-orange-800">
+                  Leaving on {new Date(tech.leaving_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-xs text-orange-600 mt-1">
+                  All confirmed visits from that date have been banked for reassignment.
+                </p>
+              </div>
+              <MarkAsLeaverButton techId={id} techName={tech.full_name} isLeaver={isLeaver} />
             </div>
           ) : (
             <div>
               <p className="text-xs text-gray-400 mb-3">
                 Marking as a leaver will bank all future confirmed visits from the leaving date onwards.
               </p>
-              <MarkAsLeaverButton techId={id} techName={tech.full_name} />
+              <MarkAsLeaverButton techId={id} techName={tech.full_name} isLeaver={isLeaver} />
             </div>
           )}
         </div>

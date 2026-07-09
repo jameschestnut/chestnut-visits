@@ -29,11 +29,11 @@ export default function EditTechnicianPage() {
     dbs_issue_date:  '',
     dbs_expiry_date: '',
     notes:           '',
-    is_active:       true,
     photo_url:       '',
     job_title:       '',
     date_of_birth:   '',
   })
+  const [supportTiers, setSupportTiers] = useState<string[]>([])
 
   useEffect(() => {
     async function load() {
@@ -55,11 +55,11 @@ export default function EditTechnicianPage() {
           dbs_issue_date:  data.dbs_issue_date ?? '',
           dbs_expiry_date: data.dbs_expiry_date ?? '',
           notes:           data.notes ?? '',
-          is_active:       data.is_active ?? true,
           photo_url:       data.photo_url ?? '',
-          job_title:     data.job_title ?? '',
-          date_of_birth: data.date_of_birth ?? '',
+          job_title:       data.job_title ?? '',
+          date_of_birth:   data.date_of_birth ?? '',
         })
+        setSupportTiers(data.support_tiers ?? [])
       }
       setLoading(false)
     }
@@ -92,9 +92,9 @@ export default function EditTechnicianPage() {
         dbs_issue_date:  form.dbs_issue_date || null,
         dbs_expiry_date: form.dbs_expiry_date || null,
         notes:           form.notes.trim() || null,
-        is_active:       form.is_active,
-        job_title:     form.job_title.trim() || null,
-        date_of_birth: form.date_of_birth || null,
+        job_title:      form.job_title.trim() || null,
+        date_of_birth:  form.date_of_birth || null,
+        support_tiers:  supportTiers,
       })
       .eq('id', techId)
 
@@ -176,6 +176,29 @@ export default function EditTechnicianPage() {
 </div>
 
 <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">Support tiers</label>
+  <div className="flex gap-2">
+    {[
+      { value: 'first_line',  label: '1st Line' },
+      { value: 'second_line', label: '2nd Line' },
+    ].map(tier => {
+      const active = supportTiers.includes(tier.value)
+      return (
+        <button key={tier.value} type="button"
+          onClick={() => setSupportTiers(prev =>
+            active ? prev.filter(t => t !== tier.value) : [...prev, tier.value]
+          )}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+            active ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+          }`}>
+          {tier.label}
+        </button>
+      )
+    })}
+  </div>
+</div>
+
+<div>
   <label className="block text-sm font-medium text-gray-700 mb-1">Date of birth</label>
   <input name="date_of_birth" type="date" value={form.date_of_birth}
     onChange={handleChange}
@@ -205,11 +228,6 @@ export default function EditTechnicianPage() {
               className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
           </div>
 
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input name="is_active" type="checkbox" checked={form.is_active}
-              onChange={handleChange} className="accent-gray-900" />
-            <span className="text-sm font-medium text-gray-700">Active</span>
-          </label>
         </div>
 
         {/* DBS */}

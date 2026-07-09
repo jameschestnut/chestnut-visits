@@ -100,7 +100,7 @@ export default function CalendarPage() {
   const [showSetup, setShowSetup]           = useState(false)
   const [setupStartDate, setSetupStartDate] = useState('')
   const [setupEndDate, setSetupEndDate]     = useState('')
-  const [setupStartRota, setSetupStartRota] = useState(1)
+
   const [generating, setGenerating]         = useState(false)
 
   // ── Load data ──────────────────────────────────────────────────────────────
@@ -277,10 +277,19 @@ export default function CalendarPage() {
         end_date:   editingTerm.end_date,
       }).eq('id', editingTerm.id)
     } else {
+      const { data: region } = await supabase.from('term_date_regions').select('id').eq('name', 'worcestershire').single()
+      const termMonth = new Date(editingTerm.start_date + 'T12:00:00').getMonth() + 1
+      const termOrder = termMonth >= 9 ? 1 : termMonth <= 3 ? 2 : 3
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000
+      const weekCount = Math.round((new Date(editingTerm.end_date + 'T12:00:00').getTime() - new Date(editingTerm.start_date + 'T12:00:00').getTime()) / msPerWeek) + 1
       await supabase.from('term_dates').insert({
-        term_name:  editingTerm.term_name.trim(),
-        start_date: editingTerm.start_date,
-        end_date:   editingTerm.end_date,
+        term_name:     editingTerm.term_name.trim(),
+        start_date:    editingTerm.start_date,
+        end_date:      editingTerm.end_date,
+        region_id:     region?.id,
+        academic_year: getAcademicYear(editingTerm.start_date),
+        term_order:    termOrder,
+        week_count:    weekCount,
       })
     }
     setSavingTerm(false)
@@ -325,21 +334,13 @@ export default function CalendarPage() {
 
     const start  = getMonday(new Date(setupStartDate + 'T12:00:00'))
     const end    = new Date(setupEndDate + 'T12:00:00')
-    const rows: { week_start: string; rota_week: number; academic_year: string; is_override: boolean }[] = []
+    const rows: { week_start: string; academic_year: string; rota_week: null; is_override: boolean }[] = []
 
     let current = new Date(start)
-    let rotaNum = setupStartRota - 1
-
     while (current <= end) {
       if (isSchoolWeek(current)) {
-        rotaNum = (rotaNum % 6) + 1
         const weekStr = toStr(current)
-        rows.push({
-          week_start:    weekStr,
-          rota_week:     rotaNum,
-          academic_year: getAcademicYear(weekStr),
-          is_override:   false,
-        })
+        rows.push({ week_start: weekStr, academic_year: getAcademicYear(weekStr), rota_week: null, is_override: false })
       }
       current = addDays(current, 7)
     }
@@ -1019,7 +1020,7 @@ export default function CalendarPage() {
           <div className="relative bg-white rounded-xl shadow-xl border border-gray-100 p-5 w-96" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Set up rota calendar</h3>
             <p className="text-xs text-gray-400 mb-4">
-              Auto-numbers all school weeks in the date range, skipping holidays. You can override individual weeks afterwards.
+              Creates blank rows for all school weeks in the date range. Set rota tags manually in the Schedule Weeks tab afterwards.
             </p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -1034,20 +1035,6 @@ export default function CalendarPage() {
                   <input type="date" value={setupEndDate}
                     onChange={e => setSetupEndDate(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  First school week in this range is rota week...
-                </label>
-                <div className="flex gap-2">
-                  {[1,2,3,4,5,6].map(w => (
-                    <button key={w} onClick={() => setSetupStartRota(w)}
-                      className="flex-1 h-9 rounded-lg text-sm font-bold text-white transition-opacity"
-                      style={{ background: ROTA_COLOURS[w], opacity: setupStartRota === w ? 1 : 0.25 }}>
-                      {w}
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>

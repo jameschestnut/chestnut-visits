@@ -17,7 +17,6 @@ const VISIT_TYPES: {
   { value: 'handover',           label: 'Handover',      colour: '#92400E', needsSchool: true,  isAbsence: false },
   { value: 'shadow',             label: 'Shadow',        colour: '#065F46', needsSchool: true,  isAbsence: false },
   { value: 'installation',       label: 'Installation',  colour: '#1E40AF', needsSchool: true,  isAbsence: false },
-  { value: 'phone_duty',         label: 'Phone duty',    colour: '#0E7490', needsSchool: false, isAbsence: false },
   { value: 'other_visit',        label: 'Other visit',   colour: '#374151', needsSchool: false, isAbsence: false },
   { value: 'annual_leave',       label: 'Annual leave',  colour: '#0369A1', needsSchool: false, isAbsence: true  },
   { value: 'sickness',           label: 'Sickness',      colour: '#DC2626', needsSchool: false, isAbsence: true  },
@@ -101,6 +100,7 @@ export default function WeeklyPlannerPage() {
   const [bankHolidays, setBankHolidays] = useState<BankHoliday[]>([])
   const [termDates, setTermDates] = useState<TermDate[]>([])
   const [sidebar, setSidebar] = useState<SidebarVisit[]>([])
+  const [supportRota, setSupportRota] = useState<{ technician_id: string; rota_date: string; shift_type: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState<PendingChange[]>([])
   const [saving, setSaving] = useState(false)
@@ -130,7 +130,7 @@ export default function WeeklyPlannerPage() {
       const weekEnd   = weekDates[4].dateStr
       const [
         { data: techs }, { data: weekVisits }, { data: bankedVisits },
-        { data: holidays }, { data: terms }, { data: schoolList },
+        { data: holidays }, { data: terms }, { data: schoolList }, { data: rotaData },
       ] = await Promise.all([
         supabase.from('technicians').select('id, full_name, initials, photo_url').eq('is_active', true).order('full_name'),
         supabase.from('visits').select(`id, school_id, technician_id, visit_date, slot, status, visit_type, travel_warning, notes, schools (id, name, short_name)`).neq('status','banked').gte('visit_date', weekStart).lte('visit_date', weekEnd),
@@ -138,6 +138,7 @@ export default function WeeklyPlannerPage() {
         supabase.from('bank_holidays').select('holiday_date, name'),
         supabase.from('term_dates').select('start_date, end_date'),
         supabase.from('schools').select('id, name, short_name').eq('is_active', true).order('name'),
+        supabase.from('support_rota').select('technician_id, rota_date, shift_type').gte('rota_date', weekStart).lte('rota_date', weekEnd),
       ])
 
       // Also load any inactive technicians who have visits this week
@@ -149,6 +150,7 @@ export default function WeeklyPlannerPage() {
       const allTechs = [...(techs ?? []), ...extraTechs].sort((a: { full_name: string }, b: { full_name: string }) => a.full_name.localeCompare(b.full_name))
 
       setTechnicians(allTechs)
+      setSupportRota(rotaData ?? [])
       setVisits(weekVisits ?? [])
       setBankHolidays(holidays ?? [])
       setTermDates(terms ?? [])
@@ -173,6 +175,16 @@ export default function WeeklyPlannerPage() {
     return null
   }
   function isSlotFree(techId: string, dateStr: string, slot: string): boolean { return !getVisit(techId, dateStr, slot) }
+
+  function getPhoneSlot(techId: string, dateStr: string, slot: string): string | null {
+    const suffix = slot === 'am' ? '_am' : '_pm'
+    const entry = supportRota.find(r => r.technician_id === techId && r.rota_date === dateStr && r.shift_type.endsWith(suffix))
+    if (!entry) return null
+    if (entry.shift_type.startsWith('first_early')) return '1st Early'
+    if (entry.shift_type.startsWith('first_late'))  return '1st Late'
+    if (entry.shift_type.startsWith('second'))       return '2nd Line'
+    return 'Phones'
+  }
 
   function onDragStartGrid(visit: Visit) { drag.current = { source: 'grid', visitId: visit.id } }
   function onDragStartSidebar(item: SidebarVisit) { drag.current = { source: 'sidebar', sidebarItem: item } }
@@ -377,12 +389,13 @@ export default function WeeklyPlannerPage() {
                       const isPast = d.dateStr < todayStr && !d.isToday
                       const cellBg = bh ? '#fef2f2' : !inTerm ? '#f8fafc' : d.isToday ? '#d1fae5' : slot === 'am' ? amBg : pmBg
                       const cfg = visit ? getVisitTypeConfig(visit.visit_type) : null
+                      const phoneSlot = !visit ? getPhoneSlot(tech.id, d.dateStr, slot) : null
 
                       if (isBottomOfMerge) return null
 
                       return (
                         <td key={d.key} className="px-1 py-0.5 border-r border-gray-100 last:border-r-0"
-                          style={{ background: cellBg, opacity: isPast ? 0.6 : 1 }}
+                          style={{ background: phoneSlot ? '#f0f9ff' : cellBg, opacity: isPast ? 0.6 : 1 }}
                           rowSpan={mergeType ? 2 : 1}>
 
                           {(bh || !inTerm) && !visit ? (
@@ -406,6 +419,11 @@ export default function WeeklyPlannerPage() {
                                 {visit.status === 'completed' && <span>✓</span>}
                                 <button onClick={() => { setDeleteTarget(visit); setDeleteReason('') }} className="opacity-40 hover:opacity-100 text-xs" title="Delete">✕</button>
                               </div>
+                            </div>
+                          ) : phoneSlot ? (
+                            <div className="rounded text-xs font-medium flex items-center justify-center gap-1 px-1.5 py-0.5"
+                              style={{ minHeight: 24, background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                              📞 {phoneSlot}
                             </div>
                           ) : (
                             <div

@@ -14,6 +14,7 @@ interface Technician {
   photo_url: string | null
   job_title: string | null
   leaving_date: string | null
+  support_tiers: string[] | null
 }
 
 export default function TechniciansPage() {
@@ -33,7 +34,7 @@ export default function TechniciansPage() {
       const today = new Date().toISOString().split('T')[0]
       const { data } = await supabase
         .from('technicians')
-        .select('id, full_name, initials, email, is_active, photo_url, job_title, leaving_date')
+        .select('id, full_name, initials, email, is_active, photo_url, job_title, leaving_date, support_tiers')
         .order('full_name')
       // Include active techs + anyone with a future leaving date (still current employees)
       setTechnicians((data ?? []).filter((t: Technician) =>
@@ -86,17 +87,15 @@ export default function TechniciansPage() {
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search..."
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-48" />
-          {inactiveCount > 0 && (
-            <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={hideInactive}
-                onChange={e => setHideInactive(e.target.checked)}
+                checked={!hideInactive}
+                onChange={e => setHideInactive(!e.target.checked)}
                 className="accent-gray-900"
               />
-              <span className="text-sm text-gray-600">Hide inactive</span>
+              <span className="text-sm text-gray-600">Show inactive ({inactiveCount})</span>
             </label>
-          )}
           <Link
             href="/admin/technicians/new"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
@@ -145,7 +144,17 @@ export default function TechniciansPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{tech.job_title ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-gray-500">{tech.job_title ?? '—'}</span>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {(tech.support_tiers ?? []).includes('first_line') && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-50 text-blue-700 border border-blue-100">1st Line</span>
+                      )}
+                      {(tech.support_tiers ?? []).includes('second_line') && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-50 text-amber-700 border border-amber-100">2nd Line</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{tech.email}</td>
                   <td className="px-4 py-3">
                     {tech.leaving_date ? (

@@ -7,17 +7,20 @@ import { createClient } from '@/lib/supabase'
 export default function MarkAsLeaverButton({
   techId,
   techName,
+  isLeaver,
 }: {
   techId: string
   techName: string
+  isLeaver: boolean
 }) {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [open, setOpen]           = useState(false)
+  const [open, setOpen]               = useState(false)
   const [leavingDate, setLeavingDate] = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState<string | null>(null)
+  const [loading, setLoading]         = useState(false)
+  const [error, setError]             = useState<string | null>(null)
+  const [undoing, setUndoing]         = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -63,12 +66,22 @@ export default function MarkAsLeaverButton({
     setLoading(false)
   }
 
+  async function handleUndo() {
+    setUndoing(true)
+    await supabase.from('technicians').update({ leaving_date: null, is_active: true }).eq('id', techId)
+    router.refresh()
+    setUndoing(false)
+  }
+
   if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="px-4 py-2 rounded-lg text-sm font-medium text-orange-700 border border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors"
-      >
+    return isLeaver ? (
+      <button onClick={handleUndo} disabled={undoing}
+        className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50">
+        {undoing ? 'Undoing…' : 'Undo leaver'}
+      </button>
+    ) : (
+      <button onClick={() => setOpen(true)}
+        className="px-4 py-2 rounded-lg text-sm font-medium text-orange-700 border border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors">
         Mark as leaver
       </button>
     )
