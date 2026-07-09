@@ -31,15 +31,11 @@ export default function TechniciansPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const today = new Date().toISOString().split('T')[0]
       const { data } = await supabase
         .from('technicians')
         .select('id, full_name, initials, email, is_active, photo_url, job_title, leaving_date, support_tiers')
         .order('full_name')
-      // Include active techs + anyone with a future leaving date (still current employees)
-      setTechnicians((data ?? []).filter((t: Technician) =>
-        t.is_active || (t.leaving_date && t.leaving_date >= today)
-      ))
+      setTechnicians(data ?? [])
       setLoading(false)
     }
     load()
@@ -56,7 +52,7 @@ export default function TechniciansPage() {
 
   const today = new Date().toISOString().split('T')[0]
   const filtered = technicians
-    .filter(t => (hideInactive && !search) ? (t.is_active || (t.leaving_date && t.leaving_date >= today)) : true)
+    .filter(t => (!hideInactive || search) ? true : (t.is_active || (t.leaving_date && t.leaving_date >= today)))
     .filter(t => !search || t.full_name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const av = (a[sortCol] ?? '').toLowerCase()
@@ -90,11 +86,11 @@ export default function TechniciansPage() {
           <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={!hideInactive}
-                onChange={e => setHideInactive(!e.target.checked)}
+                checked={hideInactive}
+                onChange={e => setHideInactive(e.target.checked)}
                 className="accent-gray-900"
               />
-              <span className="text-sm text-gray-600">Show inactive ({inactiveCount})</span>
+              <span className="text-sm text-gray-600">Hide inactive ({inactiveCount})</span>
             </label>
           <Link
             href="/admin/technicians/new"
