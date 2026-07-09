@@ -87,17 +87,15 @@ export default function TechniciansPage() {
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search..."
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-48" />
-          {inactiveCount > 0 && (
-            <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={hideInactive}
-                onChange={e => setHideInactive(e.target.checked)}
+                checked={!hideInactive}
+                onChange={e => setHideInactive(!e.target.checked)}
                 className="accent-gray-900"
               />
-              <span className="text-sm text-gray-600">Hide inactive</span>
+              <span className="text-sm text-gray-600">Show inactive ({inactiveCount})</span>
             </label>
-          )}
           <Link
             href="/admin/technicians/new"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
